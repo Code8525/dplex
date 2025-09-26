@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pip install dataplex
+pip install dplex
 ```
 
 ## Basic Usage

@@ -15,7 +15,7 @@ def get_file_contents() -> Dict[str, str]:
     return {
         # === ОСНОВНЫЕ КОНФИГУРАЦИОННЫЕ ФАЙЛЫ ===
         "pyproject.toml": '''[tool.poetry]
-name = "dataplex"
+name = "dplex"
 version = "0.1.0"
 description = "Enterprise-grade data layer framework for Python"
 authors = ["Your Name <your.email@example.com>"]
@@ -46,7 +46,7 @@ black = "^23.7.0"
 mypy = "^1.5.0"
 
 [tool.poetry.scripts]
-dataplex = "dataplex.cli.main:main"
+dplex = "dplex.cli.main:main"
 
 [build-system]
 requires = ["poetry-core"]
@@ -68,11 +68,11 @@ build-backend = "poetry.core.masonry.api"
 ## Quick Start
 
 ```bash
-pip install dataplex
+pip install dplex
 ```
 
 ```python
-from dataplex import BaseRepository, BaseService
+from dplex import BaseRepository, BaseService
 
 # Create repository
 user_repo = BaseRepository(User, session)
@@ -199,12 +199,12 @@ jobs:
       run: poetry install --with dev
 
     - name: Run tests
-      run: poetry run pytest --cov=dataplex
+      run: poetry run pytest --cov=dplex
 
     - name: Run linting
       run: |
-        poetry run black --check dataplex/
-        poetry run mypy dataplex/
+        poetry run black --check dplex/
+        poetry run mypy dplex/
 ''',
 
         ".github/workflows/publish.yml": '''name: Publish to PyPI
@@ -236,7 +236,7 @@ jobs:
 ''',
 
         # === ОСНОВНОЙ ПАКЕТ ===
-        "dataplex/__init__.py": '''"""
+        "dplex/__init__.py": '''"""
 Dataplex - Enterprise-grade data layer framework for Python
 """
 
@@ -254,12 +254,12 @@ __all__ = [
 ]
 ''',
 
-        "dataplex/version.py": '''"""Version information for Dataplex"""
+        "dplex/version.py": '''"""Version information for Dataplex"""
 
 __version__ = "0.1.0"
 ''',
 
-        "dataplex/exceptions.py": '''"""Dataplex exceptions"""
+        "dplex/exceptions.py": '''"""Dataplex exceptions"""
 
 
 class DataplexException(Exception):
@@ -297,7 +297,7 @@ class ValidationError(DataplexException):
     pass
 ''',
 
-        "dataplex/types.py": '''"""Common types for Dataplex"""
+        "dplex/types.py": '''"""Common types for Dataplex"""
 
 import uuid
 from typing import TypeVar, Union
@@ -316,7 +316,7 @@ AnyKeyType = Union[int, str, uuid.UUID]
 ''',
 
         # === REPOSITORIES ===
-        "dataplex/repositories/__init__.py": '''"""Repository module"""
+        "dplex/repositories/__init__.py": '''"""Repository module"""
 
 from .base import BaseRepository
 from .query_builder import QueryBuilder
@@ -324,7 +324,7 @@ from .query_builder import QueryBuilder
 __all__ = ["BaseRepository", "QueryBuilder"]
 ''',
 
-        "dataplex/repositories/base_repository.py": '''"""Base repository implementation"""
+        "dplex/repositories/base_repository.py": '''"""Base repository implementation"""
 
 import uuid
 from typing import Any, Generic, TypeVar
@@ -381,7 +381,7 @@ class BaseRepository(Generic[ModelSchema, KeyType]):
         await self.session.commit()
 ''',
 
-        "dataplex/repositories/query_builder.py": '''"""Query builder implementation"""
+        "dplex/repositories/query_builder.py": '''"""Query builder implementation"""
 
 from typing import Any, Generic, TypeVar
 from sqlalchemy import select
@@ -426,7 +426,7 @@ class QueryBuilder(Generic[ModelSchema]):
         return result.scalars().first()
 ''',
 
-        "dataplex/repositories/mixins.py": '''"""Repository mixins"""
+        "dplex/repositories/mixins.py": '''"""Repository mixins"""
 
 from typing import Any
 
@@ -442,14 +442,14 @@ class SoftDeleteMixin:
 ''',
 
         # === SERVICES ===
-        "dataplex/services/__init__.py": '''"""Service module"""
+        "dplex/services/__init__.py": '''"""Service module"""
 
 from .base import BaseService
 
 __all__ = ["BaseService"]
 ''',
 
-        "dataplex/services/base_repository.py": '''"""Base service implementation"""
+        "dplex/services/base_repository.py": '''"""Base service implementation"""
 
 from typing import Any, Generic, TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -499,7 +499,7 @@ class BaseService(Generic[ModelSchema, KeyType, CreateSchemaType, UpdateSchemaTy
             raise ValueError(f"Unsupported create_data type: {type(create_data)}")
 ''',
 
-        "dataplex/services/mixins.py": '''"""Service mixins"""
+        "dplex/services/mixins.py": '''"""Service mixins"""
 
 
 class CacheMixin:
@@ -518,7 +518,7 @@ class ValidationMixin:
 ''',
 
         # === FILTERS ===
-        "dataplex/filters/__init__.py": '''"""Filter module"""
+        "dplex/filters/__init__.py": '''"""Filter module"""
 
 from .base import FilterSchema
 from .operators import NumericFilter, StringFilter, BoolFilter
@@ -526,7 +526,7 @@ from .operators import NumericFilter, StringFilter, BoolFilter
 __all__ = ["FilterSchema", "NumericFilter", "StringFilter", "BoolFilter"]
 ''',
 
-        "dataplex/filters/base_repository.py": '''"""Base filter schema"""
+        "dplex/filters/base_repository.py": '''"""Base filter schema"""
 
 from dataclasses import dataclass
 from typing import Any
@@ -543,7 +543,7 @@ class FilterSchema:
         return query
 ''',
 
-        "dataplex/filters/operators.py": '''"""Typed filter operators"""
+        "dplex/filters/operators.py": '''"""Typed filter operators"""
 
 from dataclasses import dataclass
 from typing import Generic, TypeVar
@@ -579,7 +579,7 @@ class BoolFilter:
     eq: bool | None = None
 ''',
 
-        "dataplex/filters/schemas.py": '''"""Ready-to-use filter schemas"""
+        "dplex/filters/schemas.py": '''"""Ready-to-use filter schemas"""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -606,50 +606,50 @@ class BaseEntityFilterSchema(FilterSchema):
 ''',
 
         # === ОСТАЛЬНЫЕ МОДУЛИ (заглушки) ===
-        "dataplex/cache/__init__.py": '''"""Cache module"""
+        "dplex/cache/__init__.py": '''"""Cache module"""
 
 # TODO: Implement caching functionality
 ''',
 
-        "dataplex/audit/__init__.py": '''"""Audit module"""
+        "dplex/audit/__init__.py": '''"""Audit module"""
 
 # TODO: Implement audit logging
 ''',
 
-        "dataplex/soft_delete/__init__.py": '''"""Soft delete module"""
+        "dplex/soft_delete/__init__.py": '''"""Soft delete module"""
 
 # TODO: Implement soft delete functionality
 ''',
 
-        "dataplex/versioning/__init__.py": '''"""Versioning module"""
+        "dplex/versioning/__init__.py": '''"""Versioning module"""
 
 # TODO: Implement versioning
 ''',
 
-        "dataplex/validation/__init__.py": '''"""Validation module"""
+        "dplex/validation/__init__.py": '''"""Validation module"""
 
 # TODO: Implement validation rules
 ''',
 
-        "dataplex/migrations/__init__.py": '''"""Migrations module"""
+        "dplex/migrations/__init__.py": '''"""Migrations module"""
 
 # TODO: Implement schema migrations
 ''',
 
-        "dataplex/metrics/__init__.py": '''"""Metrics module"""
+        "dplex/metrics/__init__.py": '''"""Metrics module"""
 
 # TODO: Implement performance metrics
 ''',
 
-        "dataplex/integrations/__init__.py": '''"""Integrations module"""
+        "dplex/integrations/__init__.py": '''"""Integrations module"""
 
 # TODO: Implement framework integrations
 ''',
 
-        "dataplex/cli/__init__.py": '''"""CLI module"""
+        "dplex/cli/__init__.py": '''"""CLI module"""
 ''',
 
-        "dataplex/cli/main.py": '''"""Main CLI entry point"""
+        "dplex/cli/main.py": '''"""Main CLI entry point"""
 
 import click
 
@@ -706,7 +706,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
-from dataplex import BaseRepository, BaseService, FilterSchema
+from dplex import BaseRepository, BaseService, FilterSchema
 
 
 class Base(DeclarativeBase):
@@ -764,7 +764,7 @@ if __name__ == "__main__":
         "examples/fastapi_integration.py": '''"""FastAPI integration example"""
 
 from fastapi import FastAPI, Depends
-from dataplex import BaseRepository, BaseService
+from dplex import BaseRepository, BaseService
 
 app = FastAPI()
 
@@ -794,13 +794,13 @@ See [Quick Start Guide](quickstart.md) for getting started.
 ## Installation
 
 ```bash
-pip install dataplex
+pip install dplex
 ```
 
 ## Basic Usage
 
 ```python
-from dataplex import BaseRepository
+from dplex import BaseRepository
 
 # Create repository
 repo = BaseRepository(User, session)
@@ -836,22 +836,22 @@ def create_directory_structure():
         "benchmarks",
 
         # Основной пакет
-        "dataplex",
-        "dataplex/repositories",
-        "dataplex/services",
-        "dataplex/filters",
-        "dataplex/cache",
-        "dataplex/audit",
-        "dataplex/soft_delete",
-        "dataplex/versioning",
-        "dataplex/validation",
-        "dataplex/migrations",
-        "dataplex/metrics",
-        "dataplex/integrations/fastapi",
-        "dataplex/integrations/django/management",
-        "dataplex/integrations/flask",
-        "dataplex/integrations/pydantic",
-        "dataplex/cli",
+        "dplex",
+        "dplex/repositories",
+        "dplex/services",
+        "dplex/filters",
+        "dplex/cache",
+        "dplex/audit",
+        "dplex/soft_delete",
+        "dplex/versioning",
+        "dplex/validation",
+        "dplex/migrations",
+        "dplex/metrics",
+        "dplex/integrations/fastapi",
+        "dplex/integrations/django/management",
+        "dplex/integrations/flask",
+        "dplex/integrations/pydantic",
+        "dplex/cli",
     ]
 
     for directory in directories:
@@ -880,37 +880,37 @@ def create_empty_files():
 
     init_files = [
         # Дополнительные __init__.py файлы
-        "dataplex/cache/redis.py",
-        "dataplex/cache/memory.py",
-        "dataplex/cache/decorators.py",
-        "dataplex/cache/strategies.py",
-        "dataplex/audit/models.py",
-        "dataplex/audit/service.py",
-        "dataplex/audit/mixins.py",
-        "dataplex/audit/context.py",
-        "dataplex/soft_delete/mixins.py",
-        "dataplex/soft_delete/managers.py",
-        "dataplex/versioning/models.py",
-        "dataplex/versioning/mixins.py",
-        "dataplex/versioning/strategies.py",
-        "dataplex/validation/rules.py",
-        "dataplex/validation/validators.py",
-        "dataplex/validation/decorators.py",
-        "dataplex/migrations/manager.py",
-        "dataplex/migrations/generator.py",
-        "dataplex/migrations/runner.py",
-        "dataplex/metrics/collectors.py",
-        "dataplex/metrics/exporters.py",
-        "dataplex/metrics/decorators.py",
-        "dataplex/integrations/fastapi/dependencies.py",
-        "dataplex/integrations/fastapi/filters.py",
-        "dataplex/integrations/fastapi/middleware.py",
-        "dataplex/integrations/django/management/commands/__init__.py",
-        "dataplex/integrations/flask/__init__.py",
-        "dataplex/integrations/pydantic/filters.py",
-        "dataplex/cli/migrate.py",
-        "dataplex/cli/generate.py",
-        "dataplex/cli/benchmark.py",
+        "dplex/cache/redis.py",
+        "dplex/cache/memory.py",
+        "dplex/cache/decorators.py",
+        "dplex/cache/strategies.py",
+        "dplex/audit/models.py",
+        "dplex/audit/service.py",
+        "dplex/audit/mixins.py",
+        "dplex/audit/context.py",
+        "dplex/soft_delete/mixins.py",
+        "dplex/soft_delete/managers.py",
+        "dplex/versioning/models.py",
+        "dplex/versioning/mixins.py",
+        "dplex/versioning/strategies.py",
+        "dplex/validation/rules.py",
+        "dplex/validation/validators.py",
+        "dplex/validation/decorators.py",
+        "dplex/migrations/manager.py",
+        "dplex/migrations/generator.py",
+        "dplex/migrations/runner.py",
+        "dplex/metrics/collectors.py",
+        "dplex/metrics/exporters.py",
+        "dplex/metrics/decorators.py",
+        "dplex/integrations/fastapi/dependencies.py",
+        "dplex/integrations/fastapi/filters.py",
+        "dplex/integrations/fastapi/middleware.py",
+        "dplex/integrations/django/management/commands/__init__.py",
+        "dplex/integrations/flask/__init__.py",
+        "dplex/integrations/pydantic/filters.py",
+        "dplex/cli/migrate.py",
+        "dplex/cli/generate.py",
+        "dplex/cli/benchmark.py",
         "benchmarks/query_performance.py",
         "benchmarks/cache_performance.py",
         "examples/complex_filtering.py",
@@ -952,10 +952,10 @@ def main():
     print("\n" + "=" * 50)
     print("✅ Проект Dataplex успешно создан!")
     print("\nСледующие шаги:")
-    print("1. cd dataplex")
+    print("1. cd dplex")
     print("2. poetry install")
     print("3. poetry run pytest")
-    print("4. poetry run dataplex --help")
+    print("4. poetry run dplex --help")
     print("\n🎉 Удачной разработки!")
 
 

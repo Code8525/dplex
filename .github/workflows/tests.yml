@@ -27,7 +27,7 @@ jobs:
       run: poetry install --with dev
 
     - name: Run tests
-      run: poetry run pytest --cov=dataplex
+      run: poetry run pytest --cov=dplex
 
     - name: Run linting
       run: |
