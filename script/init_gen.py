@@ -324,7 +324,7 @@ from .query_builder import QueryBuilder
 __all__ = ["BaseRepository", "QueryBuilder"]
 ''',
 
-        "dataplex/repositories/base.py": '''"""Base repository implementation"""
+        "dataplex/repositories/base_repository.py": '''"""Base repository implementation"""
 
 import uuid
 from typing import Any, Generic, TypeVar
@@ -449,7 +449,7 @@ from .base import BaseService
 __all__ = ["BaseService"]
 ''',
 
-        "dataplex/services/base.py": '''"""Base service implementation"""
+        "dataplex/services/base_repository.py": '''"""Base service implementation"""
 
 from typing import Any, Generic, TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -526,7 +526,7 @@ from .operators import NumericFilter, StringFilter, BoolFilter
 __all__ = ["FilterSchema", "NumericFilter", "StringFilter", "BoolFilter"]
 ''',
 
-        "dataplex/filters/base.py": '''"""Base filter schema"""
+        "dataplex/filters/base_repository.py": '''"""Base filter schema"""
 
 from dataclasses import dataclass
 from typing import Any
