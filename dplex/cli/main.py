@@ -6,14 +6,14 @@ import click
 @click.group()
 @click.version_option(version="0.1.0")
 def main():
-    """Dataplex CLI tool"""
+    """dplex CLI tool"""
     pass
 
 
 @main.command()
 def init():
-    """Initialize new Dataplex project"""
-    click.echo("Initializing Dataplex project...")
+    """Initialize new dplex project"""
+    click.echo("Initializing dplex project...")
 
 
 if __name__ == "__main__":

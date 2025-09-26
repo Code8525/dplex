@@ -1,5 +1,5 @@
 """Service module"""
 
-from .base import BaseService
+from .base_service import BaseService
 
 __all__ = ["BaseService"]

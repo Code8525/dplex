@@ -1,23 +1,20 @@
 import uuid
 from typing import Any, Generic, TypeVar
 
-from sqlalchemy import select, func, and_, delete, ColumnElement
+from sqlalchemy import select, func, and_, delete, ColumnElement, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute
 
-from dataplex import QueryBuilder
-from dataplex.types import KeyType
-
-ModelSchema = TypeVar("ModelSchema", bound=DeclarativeBase)
+from dplex import QueryBuilder
+from dplex.types import ModelType, KeyType
 
 
-
-class BaseDBRepo(Generic[ModelSchema, KeyType]):
+class BaseRepository(Generic[ModelType, KeyType]):
     """Базовый репозиторий с улучшенной типизацией"""
 
     def __init__(
         self,
-        model: type[ModelSchema],
+        model: type[ModelType],
         session: AsyncSession,
         key_type: type[KeyType] = uuid.UUID,
         id_field_name: str = "id",
@@ -38,7 +35,7 @@ class BaseDBRepo(Generic[ModelSchema, KeyType]):
             )
         return column
 
-    def query(self) -> "QueryBuilder[ModelSchema]":
+    def query(self) -> "QueryBuilder[ModelType]":
         """Создать типизированный query builder"""
         return QueryBuilder(self, self.model)
 
@@ -51,11 +48,11 @@ class BaseDBRepo(Generic[ModelSchema, KeyType]):
         return self._id_column.in_(values)
 
     # Методы с использованием закешированной колонки
-    async def find_by_id(self, entity_id: KeyType) -> ModelSchema | None:
+    async def find_by_id(self, entity_id: KeyType) -> ModelType | None:
         """Найти сущность по ID"""
         return await self.query().where(self.id_eq(entity_id)).find_one()
 
-    async def find_by_ids(self, entity_ids: list[KeyType]) -> list[ModelSchema]:
+    async def find_by_ids(self, entity_ids: list[KeyType]) -> list[ModelType]:
         """Найти сущности по списку ID"""
         return await self.query().where(self.id_in(entity_ids)).find_all()
 
@@ -86,12 +83,12 @@ class BaseDBRepo(Generic[ModelSchema, KeyType]):
         count = await self.query().where(self.id_eq(entity_id)).count()
         return count > 0
 
-    async def create(self, entity: ModelSchema) -> ModelSchema:
+    async def create(self, entity: ModelType) -> ModelType:
         """Создать новую сущность"""
         self.session.add(entity)
         return entity
 
-    async def create_bulk(self, entities: list[ModelSchema]) -> list[ModelSchema]:
+    async def create_bulk(self, entities: list[ModelType]) -> list[ModelType]:
         """Создать несколько сущностей"""
         self.session.add_all(entities)
         return entities
@@ -106,8 +103,8 @@ class BaseDBRepo(Generic[ModelSchema, KeyType]):
 
     # Методы для выполнения запросов билдера
     async def execute_typed_query(
-        self, builder: "QueryBuilder[ModelSchema]"
-    ) -> list[ModelSchema]:
+        self, builder: "QueryBuilder[ModelType]"
+    ) -> list[ModelType]:
         """Выполнить типизированный запрос"""
         stmt = select(self.model)
 
@@ -126,7 +123,7 @@ class BaseDBRepo(Generic[ModelSchema, KeyType]):
         result = await self.session.scalars(stmt)
         return list(result.all())
 
-    async def execute_typed_count(self, builder: "QueryBuilder[ModelSchema]") -> int:
+    async def execute_typed_count(self, builder: "QueryBuilder[ModelType]") -> int:
         """Подсчитать записи через типизированный билдер"""
         stmt = select(func.count()).select_from(self.model)
 

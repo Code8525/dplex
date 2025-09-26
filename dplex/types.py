@@ -1,4 +1,4 @@
-"""Common types for Dataplex"""
+"""Common types for dplex"""
 
 import uuid
 from typing import TypeVar, Union

@@ -31,5 +31,5 @@ jobs:
 
     - name: Run linting
       run: |
-        poetry run black --check dataplex/
-        poetry run mypy dataplex/
+        poetry run black --check dplex/
+        poetry run mypy dplex/

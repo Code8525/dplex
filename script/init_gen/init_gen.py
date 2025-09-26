@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Скрипт для создания структуры проекта Dataplex
-Запуск: python create_dataplex.py
+Скрипт для создания структуры проекта dplex
+Запуск: python create_dplex.py
 """
 
 import os
@@ -21,8 +21,8 @@ description = "Enterprise-grade data layer framework for Python"
 authors = ["Your Name <your.email@example.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/yourusername/dataplex"
-repository = "https://github.com/yourusername/dataplex"
+homepage = "https://github.com/yourusername/dplex"
+repository = "https://github.com/yourusername/dplex"
 keywords = ["sqlalchemy", "orm", "repository", "service", "cache", "audit"]
 
 [tool.poetry.dependencies]
@@ -53,7 +53,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 ''',
 
-        "README.md": '''# Dataplex
+        "README.md": '''# dplex
 
 **Enterprise-grade data layer framework for Python**
 
@@ -89,7 +89,7 @@ MIT License
 
         "LICENSE": '''MIT License
 
-Copyright (c) 2024 Dataplex Contributors
+Copyright (c) 2024 dplex Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -237,7 +237,7 @@ jobs:
 
         # === ОСНОВНОЙ ПАКЕТ ===
         "dplex/__init__.py": '''"""
-Dataplex - Enterprise-grade data layer framework for Python
+dplex - Enterprise-grade data layer framework for Python
 """
 
 __version__ = "0.1.0"
@@ -254,50 +254,50 @@ __all__ = [
 ]
 ''',
 
-        "dplex/version.py": '''"""Version information for Dataplex"""
+        "dplex/version.py": '''"""Version information for dplex"""
 
 __version__ = "0.1.0"
 ''',
 
-        "dplex/exceptions.py": '''"""Dataplex exceptions"""
+        "dplex/exceptions.py": '''"""dplex exceptions"""
 
 
-class DataplexException(Exception):
-    """Base Dataplex exception"""
+class dplexException(Exception):
+    """Base dplex exception"""
     pass
 
 
-class RepositoryError(DataplexException):
+class RepositoryError(dplexException):
     """Repository related errors"""
     pass
 
 
-class ServiceError(DataplexException):
+class ServiceError(dplexException):
     """Service related errors"""
     pass
 
 
-class FilterError(DataplexException):
+class FilterError(dplexException):
     """Filter related errors"""
     pass
 
 
-class CacheError(DataplexException):
+class CacheError(dplexException):
     """Cache related errors"""
     pass
 
 
-class AuditError(DataplexException):
+class AuditError(dplexException):
     """Audit related errors"""
     pass
 
 
-class ValidationError(DataplexException):
+class ValidationError(dplexException):
     """Validation related errors"""
     pass
 ''',
 
-        "dplex/types.py": '''"""Common types for Dataplex"""
+        "dplex/types.py": '''"""Common types for dplex"""
 
 import uuid
 from typing import TypeVar, Union
@@ -657,14 +657,14 @@ import click
 @click.group()
 @click.version_option(version="0.1.0")
 def main():
-    """Dataplex CLI tool"""
+    """dplex CLI tool"""
     pass
 
 
 @main.command()
 def init():
-    """Initialize new Dataplex project"""
-    click.echo("Initializing Dataplex project...")
+    """Initialize new dplex project"""
+    click.echo("Initializing dplex project...")
 
 
 if __name__ == "__main__":
@@ -772,9 +772,9 @@ app = FastAPI()
 ''',
 
         # === ДОКУМЕНТАЦИЯ ===
-        "docs/index.md": '''# Dataplex Documentation
+        "docs/index.md": '''# dplex Documentation
 
-Welcome to Dataplex - Enterprise-grade data layer framework for Python.
+Welcome to dplex - Enterprise-grade data layer framework for Python.
 
 ## Features
 
@@ -934,7 +934,7 @@ def create_empty_files():
 def main():
     """Основная функция создания проекта"""
 
-    print("🚀 Создание структуры проекта Dataplex...")
+    print("🚀 Создание структуры проекта dplex...")
     print("=" * 50)
 
     # Создаем директории
@@ -950,7 +950,7 @@ def main():
     create_empty_files()
 
     print("\n" + "=" * 50)
-    print("✅ Проект Dataplex успешно создан!")
+    print("✅ Проект dplex успешно создан!")
     print("\nСледующие шаги:")
     print("1. cd dplex")
     print("2. poetry install")

@@ -9,7 +9,7 @@ pip install dplex
 ## Basic Usage
 
 ```python
-from dataplex import BaseRepository
+from dplex import BaseRepository
 
 # Create repository
 repo = BaseRepository(User, session)

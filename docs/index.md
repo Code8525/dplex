@@ -1,6 +1,6 @@
-# Dataplex Documentation
+# dplex Documentation
 
-Welcome to Dataplex - Enterprise-grade data layer framework for Python.
+Welcome to dplex - Enterprise-grade data layer framework for Python.
 
 ## Features
 

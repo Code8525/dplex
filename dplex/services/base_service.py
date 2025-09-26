@@ -9,6 +9,7 @@ from ..types import ModelType, KeyType, CreateSchemaType, UpdateSchemaType
 ModelSchema = TypeVar("ModelSchema")
 
 
+
 class BaseService(Generic[ModelSchema, KeyType, CreateSchemaType, UpdateSchemaType]):
     """Base service with business logic"""
 
@@ -22,7 +23,7 @@ class BaseService(Generic[ModelSchema, KeyType, CreateSchemaType, UpdateSchemaTy
 
     async def get_by_id(self, entity_id: KeyType) -> ModelSchema | None:
         """Get entity by ID"""
-        return await self.repository.get_by_id(entity_id)
+        return await self.repository.find_by_id(entity_id)
 
     async def get_all(self) -> list[ModelSchema]:
         """Get all entities"""

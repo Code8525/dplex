@@ -1,36 +1,36 @@
-"""Dataplex exceptions"""
+"""dplex exceptions"""
 
 
-class DataplexException(Exception):
-    """Base Dataplex exception"""
+class dplexException(Exception):
+    """Base dplex exception"""
     pass
 
 
-class RepositoryError(DataplexException):
+class RepositoryError(dplexException):
     """Repository related errors"""
     pass
 
 
-class ServiceError(DataplexException):
+class ServiceError(dplexException):
     """Service related errors"""
     pass
 
 
-class FilterError(DataplexException):
+class FilterError(dplexException):
     """Filter related errors"""
     pass
 
 
-class CacheError(DataplexException):
+class CacheError(dplexException):
     """Cache related errors"""
     pass
 
 
-class AuditError(DataplexException):
+class AuditError(dplexException):
     """Audit related errors"""
     pass
 
 
-class ValidationError(DataplexException):
+class ValidationError(dplexException):
     """Validation related errors"""
     pass
