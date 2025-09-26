@@ -1,0 +1,21 @@
+repos:
+- repo: local
+  hooks:
+    - id: ruff
+      name: Ruff
+      language: system
+      entry: poetry run ruff check
+      args: ["--fix", "--unsafe-fixes"]
+      files: ^src/
+      types: [ python ]
+      stages: [ pre-commit ]
+      always_run: true
+
+    - id: black
+      name: Black
+      stages: [ pre-commit ]
+      language: system
+      entry: poetry run black
+      args: ['.']
+      types: [ python ]
+      always_run: true
