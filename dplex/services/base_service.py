@@ -4,19 +4,16 @@ from typing import Any, Generic, TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories.base_repository import BaseRepository
-from ..types import ModelType, KeyType, CreateSchemaType, UpdateSchemaType
+from ..types import KeyType, CreateSchemaType, UpdateSchemaType
 
 ModelSchema = TypeVar("ModelSchema")
-
 
 
 class BaseService(Generic[ModelSchema, KeyType, CreateSchemaType, UpdateSchemaType]):
     """Base service with business logic"""
 
     def __init__(
-        self,
-        repository: BaseRepository[ModelSchema, KeyType],
-        session: AsyncSession
+        self, repository: BaseRepository[ModelSchema, KeyType], session: AsyncSession
     ) -> None:
         self.repository = repository
         self.session = session
@@ -40,9 +37,9 @@ class BaseService(Generic[ModelSchema, KeyType, CreateSchemaType, UpdateSchemaTy
     @staticmethod
     def _prepare_create_data(create_data: CreateSchemaType) -> dict[str, Any]:
         """Prepare data for creation"""
-        if hasattr(create_data, 'model_dump'):
+        if hasattr(create_data, "model_dump"):
             return create_data.model_dump(exclude_none=True)
-        elif hasattr(create_data, '__dict__'):
+        elif hasattr(create_data, "__dict__"):
             return create_data.__dict__
         elif isinstance(create_data, dict):
             return create_data

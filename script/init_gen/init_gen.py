@@ -4,7 +4,6 @@
 Запуск: python create_dplex.py
 """
 
-import os
 from pathlib import Path
 from typing import Dict
 
@@ -14,7 +13,7 @@ def get_file_contents() -> Dict[str, str]:
 
     return {
         # === ОСНОВНЫЕ КОНФИГУРАЦИОННЫЕ ФАЙЛЫ ===
-        "pyproject.toml": '''[tool.poetry]
+        "pyproject.toml": """[tool.poetry]
 name = "dplex"
 version = "0.1.0"
 description = "Enterprise-grade data layer framework for Python"
@@ -51,9 +50,8 @@ dplex = "dplex.cli.main:main"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-''',
-
-        "README.md": '''# dplex
+""",
+        "README.md": """# dplex
 
 **Enterprise-grade data layer framework for Python**
 
@@ -85,9 +83,8 @@ users = await user_repo.get_all(filters)
 ## License
 
 MIT License
-''',
-
-        "LICENSE": '''MIT License
+""",
+        "LICENSE": """MIT License
 
 Copyright (c) 2024 dplex Contributors
 
@@ -104,9 +101,8 @@ copies or substantial portions of the Software.
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-''',
-
-        "CHANGELOG.md": '''# Changelog
+""",
+        "CHANGELOG.md": """# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -119,9 +115,8 @@ All notable changes to this project will be documented in this file.
 - Filter schemas with typed operators
 - Basic caching support
 - Audit logging
-''',
-
-        ".gitignore": '''# Python
+""",
+        ".gitignore": """# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -167,10 +162,9 @@ coverage.xml
 # OS
 .DS_Store
 Thumbs.db
-''',
-
+""",
         # === GITHUB WORKFLOWS ===
-        ".github/workflows/tests.yml": '''name: Tests
+        ".github/workflows/tests.yml": """name: Tests
 
 on:
   push:
@@ -205,9 +199,8 @@ jobs:
       run: |
         poetry run black --check dplex/
         poetry run mypy dplex/
-''',
-
-        ".github/workflows/publish.yml": '''name: Publish to PyPI
+""",
+        ".github/workflows/publish.yml": """name: Publish to PyPI
 
 on:
   release:
@@ -233,8 +226,7 @@ jobs:
       run: poetry publish
       env:
         POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
-''',
-
+""",
         # === ОСНОВНОЙ ПАКЕТ ===
         "dplex/__init__.py": '''"""
 dplex - Enterprise-grade data layer framework for Python
@@ -253,12 +245,10 @@ __all__ = [
     "FilterSchema",
 ]
 ''',
-
         "dplex/version.py": '''"""Version information for dplex"""
 
 __version__ = "0.1.0"
 ''',
-
         "dplex/exceptions.py": '''"""dplex exceptions"""
 
 
@@ -296,7 +286,6 @@ class ValidationError(dplexException):
     """Validation related errors"""
     pass
 ''',
-
         "dplex/types.py": '''"""Common types for dplex"""
 
 import uuid
@@ -314,7 +303,6 @@ FilterSchemaType = TypeVar("FilterSchemaType")
 # Union types for common key types
 AnyKeyType = Union[int, str, uuid.UUID]
 ''',
-
         # === REPOSITORIES ===
         "dplex/repositories/__init__.py": '''"""Repository module"""
 
@@ -323,7 +311,6 @@ from .query_builder import QueryBuilder
 
 __all__ = ["BaseRepository", "QueryBuilder"]
 ''',
-
         "dplex/repositories/base_repository.py": '''"""Base repository implementation"""
 
 import uuid
@@ -380,7 +367,6 @@ class BaseRepository(Generic[ModelSchema, KeyType]):
         await self.session.delete(entity)
         await self.session.commit()
 ''',
-
         "dplex/repositories/query_builder.py": '''"""Query builder implementation"""
 
 from typing import Any, Generic, TypeVar
@@ -425,7 +411,6 @@ class QueryBuilder(Generic[ModelSchema]):
         result = await self.session.execute(self._query)
         return result.scalars().first()
 ''',
-
         "dplex/repositories/mixins.py": '''"""Repository mixins"""
 
 from typing import Any
@@ -440,7 +425,6 @@ class SoftDeleteMixin:
     """Mixin for soft delete functionality"""
     pass
 ''',
-
         # === SERVICES ===
         "dplex/services/__init__.py": '''"""Service module"""
 
@@ -448,7 +432,6 @@ from .base import BaseService
 
 __all__ = ["BaseService"]
 ''',
-
         "dplex/services/base_repository.py": '''"""Base service implementation"""
 
 from typing import Any, Generic, TypeVar
@@ -498,7 +481,6 @@ class BaseService(Generic[ModelSchema, KeyType, CreateSchemaType, UpdateSchemaTy
         else:
             raise ValueError(f"Unsupported create_data type: {type(create_data)}")
 ''',
-
         "dplex/services/mixins.py": '''"""Service mixins"""
 
 
@@ -516,7 +498,6 @@ class ValidationMixin:
     """Mixin for validation"""
     pass
 ''',
-
         # === FILTERS ===
         "dplex/filters/__init__.py": '''"""Filter module"""
 
@@ -525,7 +506,6 @@ from .operators import NumericFilter, StringFilter, BoolFilter
 
 __all__ = ["FilterSchema", "NumericFilter", "StringFilter", "BoolFilter"]
 ''',
-
         "dplex/filters/base_repository.py": '''"""Base filter schema"""
 
 from dataclasses import dataclass
@@ -542,7 +522,6 @@ class FilterSchema:
         """Apply filters to query builder"""
         return query
 ''',
-
         "dplex/filters/operators.py": '''"""Typed filter operators"""
 
 from dataclasses import dataclass
@@ -578,7 +557,6 @@ class BoolFilter:
     """Boolean filter operators"""
     eq: bool | None = None
 ''',
-
         "dplex/filters/schemas.py": '''"""Ready-to-use filter schemas"""
 
 from dataclasses import dataclass
@@ -604,51 +582,41 @@ class BaseEntityFilterSchema(FilterSchema):
     created_before: datetime | None = None
     is_active: bool | None = None
 ''',
-
         # === ОСТАЛЬНЫЕ МОДУЛИ (заглушки) ===
         "dplex/cache/__init__.py": '''"""Cache module"""
 
 # TODO: Implement caching functionality
 ''',
-
         "dplex/audit/__init__.py": '''"""Audit module"""
 
 # TODO: Implement audit logging
 ''',
-
         "dplex/soft_delete/__init__.py": '''"""Soft delete module"""
 
 # TODO: Implement soft delete functionality
 ''',
-
         "dplex/versioning/__init__.py": '''"""Versioning module"""
 
 # TODO: Implement versioning
 ''',
-
         "dplex/validation/__init__.py": '''"""Validation module"""
 
 # TODO: Implement validation rules
 ''',
-
         "dplex/migrations/__init__.py": '''"""Migrations module"""
 
 # TODO: Implement schema migrations
 ''',
-
         "dplex/metrics/__init__.py": '''"""Metrics module"""
 
 # TODO: Implement performance metrics
 ''',
-
         "dplex/integrations/__init__.py": '''"""Integrations module"""
 
 # TODO: Implement framework integrations
 ''',
-
         "dplex/cli/__init__.py": '''"""CLI module"""
 ''',
-
         "dplex/cli/main.py": '''"""Main CLI entry point"""
 
 import click
@@ -670,10 +638,8 @@ def init():
 if __name__ == "__main__":
     main()
 ''',
-
         # === ТЕСТЫ ===
         "tests/__init__.py": "",
-
         "tests/conftest.py": '''"""Pytest configuration"""
 
 import pytest
@@ -693,11 +659,9 @@ async def async_session():
     async with async_session() as session:
         yield session
 ''',
-
         "tests/test_repositories/__init__.py": "",
         "tests/test_services/__init__.py": "",
         "tests/test_filters/__init__.py": "",
-
         # === ПРИМЕРЫ ===
         "examples/basic_usage.py": '''"""Basic usage example"""
 
@@ -760,7 +724,6 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ''',
-
         "examples/fastapi_integration.py": '''"""FastAPI integration example"""
 
 from fastapi import FastAPI, Depends
@@ -770,9 +733,8 @@ app = FastAPI()
 
 # TODO: Add FastAPI integration example
 ''',
-
         # === ДОКУМЕНТАЦИЯ ===
-        "docs/index.md": '''# dplex Documentation
+        "docs/index.md": """# dplex Documentation
 
 Welcome to dplex - Enterprise-grade data layer framework for Python.
 
@@ -787,9 +749,8 @@ Welcome to dplex - Enterprise-grade data layer framework for Python.
 ## Quick Start
 
 See [Quick Start Guide](quickstart.md) for getting started.
-''',
-
-        "docs/quickstart.md": '''# Quick Start
+""",
+        "docs/quickstart.md": """# Quick Start
 
 ## Installation
 
@@ -813,7 +774,7 @@ users = await repo.get_all()
 
 - Check out [API Reference](api/)
 - See [Examples](examples/)
-''',
+""",
     }
 
 
@@ -834,7 +795,6 @@ def create_directory_structure():
         "tests/test_migrations",
         "tests/test_integration",
         "benchmarks",
-
         # Основной пакет
         "dplex",
         "dplex/repositories",
@@ -869,7 +829,7 @@ def create_files():
         Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
         # Записываем содержимое
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
         print(f"✅ Создан файл: {file_path}")
@@ -925,7 +885,7 @@ def create_empty_files():
         # Создаем пустой файл с комментарием TODO
         content = f'"""TODO: Implement {Path(file_path).stem} functionality"""\n'
 
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
         print(f"📝 Создан файл-заглушка: {file_path}")

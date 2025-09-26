@@ -1,7 +1,6 @@
 """FastAPI integration example"""
 
-from fastapi import FastAPI, Depends
-from dplex import BaseRepository, BaseService
+from fastapi import FastAPI
 
 app = FastAPI()
 

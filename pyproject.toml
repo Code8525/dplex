@@ -22,3 +22,67 @@ build-backend = "poetry.core.masonry.api"
 ruff = "^0.13.2"
 black = "^25.9.0"
 
+
+[tool.ruff]
+# poetry add --group dev ruff@latest
+line-length = 88
+target-version = "py312"  # или "py312" для Python 3.12
+fix = true
+include = ["./src/**"]
+
+
+[tool.ruff.lint]
+# Основные категории правил:
+select = [
+    "E", # pycodestyle (стиль)
+    "F", # pyflakes (ошибки исполнения)
+    "I", # isort (сортировка импортов)
+    "UP", # pyupgrade (обновление синтаксиса)
+    "B", # bugbear (потенциальные баги)
+    "A", # flake8-builtins (конфликты с встроенными именами)
+    "C4", # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+
+# Исключить специфичные или часто неактуальные предупреждения
+ignore = [
+    "B008", # Depends(...) в аргументах FastAPI — безопасно и распространённо
+    "E501", # Длина строки — игнорируем, т.к. используем black с line-length = 88
+    "SIM117", # Вложенные async with — читаемость в некоторых случаях важнее
+]
+
+[tool.mypy]
+# Версия Python для анализа (учитывает синтаксис 3.12: | вместо Optional, list[...] вместо List и т.д.)
+python_version = "3.12"
+
+# Ограничиваем анализ директорией src/, чтобы не проверял весь проект подряд
+files = ["src"]
+
+# Требуем, чтобы mypy рассматривал src как пакет
+explicit_package_bases = true
+
+# Подключаем плагин для корректной работы с Pydantic v2
+plugins = ["pydantic.mypy"]
+
+# Проверяем даже функции без аннотаций типов
+check_untyped_defs = true
+
+# Запрещаем функции/методы без type hints
+disallow_untyped_defs = true
+
+# Не разрешаем "скрытые Optional" (например: arg: str = None → ошибка, нужно str | None)
+no_implicit_optional = true
+
+# Предупреждаем о неиспользованных # type: ignore
+warn_unused_ignores = true
+
+# Не углубляемся в зависимости без stubs — уменьшаем шум от сторонних библиотек
+follow_imports = "silent"
+
+# Отключаем конкретные ошибки:
+# - import-untyped → не ругаемся на модули без type stubs (например, tp_shared)
+# - no-untyped-def → не ругаемся на функции без type hints (если где-то ещё остались)
+disable_error_code = ["import-untyped"]
+
+
+

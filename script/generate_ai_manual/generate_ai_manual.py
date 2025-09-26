@@ -4,9 +4,7 @@
 Запуск: python generate_ai_manual.py
 """
 
-import os
 import ast
-import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
@@ -16,6 +14,7 @@ from datetime import datetime
 @dataclass
 class FileInfo:
     """Информация о файле"""
+
     path: str
     size: int
     functions: List[str]
@@ -28,6 +27,7 @@ class FileInfo:
 @dataclass
 class ModuleInfo:
     """Информация о модуле"""
+
     name: str
     path: str
     files: List[FileInfo]
@@ -40,13 +40,21 @@ class CodeAnalyzer:
 
     def __init__(self):
         self.ignore_dirs = {
-            '__pycache__', '.git', '.pytest_cache', 'node_modules',
-            '.venv', 'venv', '.idea', '.vscode', 'dist', 'build',
-            '.mypy_cache', '.coverage', 'htmlcov'
+            "__pycache__",
+            ".git",
+            ".pytest_cache",
+            "node_modules",
+            ".venv",
+            "venv",
+            ".idea",
+            ".vscode",
+            "dist",
+            "build",
+            ".mypy_cache",
+            ".coverage",
+            "htmlcov",
         }
-        self.ignore_files = {
-            '__pycache__', '.pyc', '.pyo', '.pyd', '.so', '.egg-info'
-        }
+        self.ignore_files = {"__pycache__", ".pyc", ".pyo", ".pyd", ".so", ".egg-info"}
 
     def should_ignore(self, path: Path) -> bool:
         """Проверить, нужно ли игнорировать файл/папку"""
@@ -59,7 +67,7 @@ class CodeAnalyzer:
     def extract_python_info(self, file_path: Path) -> FileInfo:
         """Извлечь информацию из Python файла"""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
             # Парсим AST
@@ -81,18 +89,22 @@ class CodeAnalyzer:
                         for alias in node.names:
                             imports.append(alias.name)
                     else:
-                        module = node.module or ''
+                        module = node.module or ""
                         for alias in node.names:
                             imports.append(f"{module}.{alias.name}")
 
             # Извлекаем docstring модуля
-            if (isinstance(tree.body[0], ast.Expr) and
-                    isinstance(tree.body[0].value, ast.Constant) and
-                    isinstance(tree.body[0].value.value, str)):
+            if (
+                isinstance(tree.body[0], ast.Expr)
+                and isinstance(tree.body[0].value, ast.Constant)
+                and isinstance(tree.body[0].value.value, str)
+            ):
                 docstring = tree.body[0].value.value
 
             # Простая метрика сложности
-            complexity = len(functions) + len(classes) * 2 + len(content.split('\n')) // 10
+            complexity = (
+                len(functions) + len(classes) * 2 + len(content.split("\n")) // 10
+            )
 
             return FileInfo(
                 path=str(file_path),
@@ -101,7 +113,7 @@ class CodeAnalyzer:
                 classes=classes,
                 imports=imports,
                 docstring=docstring,
-                complexity_score=complexity
+                complexity_score=complexity,
             )
 
         except Exception as e:
@@ -112,17 +124,17 @@ class CodeAnalyzer:
                 classes=[],
                 imports=[],
                 docstring=f"Error parsing file: {e}",
-                complexity_score=0
+                complexity_score=0,
             )
 
     def analyze_directory(self, dir_path: Path) -> Dict[str, Any]:
         """Анализировать директорию"""
         result = {
-            'python_files': [],
-            'config_files': [],
-            'doc_files': [],
-            'other_files': [],
-            'subdirectories': []
+            "python_files": [],
+            "config_files": [],
+            "doc_files": [],
+            "other_files": [],
+            "subdirectories": [],
         }
 
         if not dir_path.exists() or self.should_ignore(dir_path):
@@ -134,17 +146,24 @@ class CodeAnalyzer:
                     continue
 
                 if item.is_file():
-                    if item.suffix == '.py':
+                    if item.suffix == ".py":
                         file_info = self.extract_python_info(item)
-                        result['python_files'].append(file_info)
-                    elif item.suffix in ['.toml', '.yaml', '.yml', '.json', '.cfg', '.ini']:
-                        result['config_files'].append(str(item))
-                    elif item.suffix in ['.md', '.rst', '.txt']:
-                        result['doc_files'].append(str(item))
+                        result["python_files"].append(file_info)
+                    elif item.suffix in [
+                        ".toml",
+                        ".yaml",
+                        ".yml",
+                        ".json",
+                        ".cfg",
+                        ".ini",
+                    ]:
+                        result["config_files"].append(str(item))
+                    elif item.suffix in [".md", ".rst", ".txt"]:
+                        result["doc_files"].append(str(item))
                     else:
-                        result['other_files'].append(str(item))
+                        result["other_files"].append(str(item))
                 elif item.is_dir():
-                    result['subdirectories'].append(str(item))
+                    result["subdirectories"].append(str(item))
 
         except PermissionError:
             pass
@@ -163,22 +182,22 @@ class AIManualGenerator:
     def get_module_purpose(self, module_path: str) -> str:
         """Определить назначение модуля по пути"""
         module_purposes = {
-            'repositories': 'Слой репозиториев для работы с данными. Содержит BaseRepository, QueryBuilder и миксины для CRUD операций.',
-            'services': 'Сервисный слой для бизнес-логики. Содержит BaseService и миксины для обработки бизнес-правил.',
-            'filters': 'Система фильтрации данных. Типизированные фильтры и операторы для построения запросов.',
-            'cache': 'Модуль кэширования. Redis интеграция, стратегии кэширования, декораторы.',
-            'audit': 'Система аудита изменений. Логирование всех операций с данными для compliance.',
-            'soft_delete': 'Модуль мягкого удаления. Позволяет "удалять" записи без физического удаления.',
-            'versioning': 'Система версионирования сущностей. Отслеживание изменений и история версий.',
-            'validation': 'Модуль валидации бизнес-правил. Валидаторы и декораторы для проверки данных.',
-            'migrations': 'Система миграций схемы БД. Управление изменениями структуры базы данных.',
-            'metrics': 'Модуль метрик производительности. Сбор и экспорт метрик для мониторинга.',
-            'integrations': 'Интеграции с фреймворками. FastAPI, Django, Flask и другие интеграции.',
-            'cli': 'Интерфейс командной строки. CLI команды для работы с dplex.',
-            'tests': 'Тесты проекта. Unit тесты, интеграционные тесты, фикстуры.',
-            'examples': 'Примеры использования. Демонстрационный код для пользователей.',
-            'docs': 'Документация проекта. Руководства, API референс, туториалы.',
-            'benchmarks': 'Бенчмарки производительности. Тесты скорости и оптимизации.'
+            "repositories": "Слой репозиториев для работы с данными. Содержит BaseRepository, QueryBuilder и миксины для CRUD операций.",
+            "services": "Сервисный слой для бизнес-логики. Содержит BaseService и миксины для обработки бизнес-правил.",
+            "filters": "Система фильтрации данных. Типизированные фильтры и операторы для построения запросов.",
+            "cache": "Модуль кэширования. Redis интеграция, стратегии кэширования, декораторы.",
+            "audit": "Система аудита изменений. Логирование всех операций с данными для compliance.",
+            "soft_delete": 'Модуль мягкого удаления. Позволяет "удалять" записи без физического удаления.',
+            "versioning": "Система версионирования сущностей. Отслеживание изменений и история версий.",
+            "validation": "Модуль валидации бизнес-правил. Валидаторы и декораторы для проверки данных.",
+            "migrations": "Система миграций схемы БД. Управление изменениями структуры базы данных.",
+            "metrics": "Модуль метрик производительности. Сбор и экспорт метрик для мониторинга.",
+            "integrations": "Интеграции с фреймворками. FastAPI, Django, Flask и другие интеграции.",
+            "cli": "Интерфейс командной строки. CLI команды для работы с dplex.",
+            "tests": "Тесты проекта. Unit тесты, интеграционные тесты, фикстуры.",
+            "examples": "Примеры использования. Демонстрационный код для пользователей.",
+            "docs": "Документация проекта. Руководства, API референс, туториалы.",
+            "benchmarks": "Бенчмарки производительности. Тесты скорости и оптимизации.",
         }
 
         for key, purpose in module_purposes.items():
@@ -195,19 +214,25 @@ class AIManualGenerator:
             """Рекурсивно сканировать директорию"""
             dir_analysis = self.analyzer.analyze_directory(current_path)
 
-            if dir_analysis['python_files'] or module_name:
+            if dir_analysis["python_files"] or module_name:
                 modules[module_name or str(current_path)] = ModuleInfo(
                     name=module_name or current_path.name,
                     path=str(current_path),
-                    files=dir_analysis['python_files'],
+                    files=dir_analysis["python_files"],
                     purpose=self.get_module_purpose(str(current_path)),
-                    dependencies=self._extract_dependencies(dir_analysis['python_files'])
+                    dependencies=self._extract_dependencies(
+                        dir_analysis["python_files"]
+                    ),
                 )
 
             # Рекурсивно обрабатываем подпапки
-            for subdir in dir_analysis['subdirectories']:
+            for subdir in dir_analysis["subdirectories"]:
                 subdir_path = Path(subdir)
-                submodule_name = f"{module_name}.{subdir_path.name}" if module_name else subdir_path.name
+                submodule_name = (
+                    f"{module_name}.{subdir_path.name}"
+                    if module_name
+                    else subdir_path.name
+                )
                 scan_directory(subdir_path, submodule_name)
 
         # Сканируем основную папку проекта
@@ -221,13 +246,13 @@ class AIManualGenerator:
         for file_info in files:
             for imp in file_info.imports:
                 # Фильтруем только внешние зависимости
-                if not imp.startswith('.') and not imp.startswith('dplex'):
-                    all_imports.add(imp.split('.')[0])
+                if not imp.startswith(".") and not imp.startswith("dplex"):
+                    all_imports.add(imp.split(".")[0])
         return sorted(list(all_imports))
 
     def generate_manual_header(self) -> str:
         """Сгенерировать заголовок мануала"""
-        return f'''# 🤖 dplex AI Assistant Manual
+        return f"""# 🤖 dplex AI Assistant Manual
 
 **Автоматически сгенерированный мануал для работы с проектом dplex**
 
@@ -270,16 +295,16 @@ class AIManualGenerator:
 - ✅ Добавьте docstring'и к новым функциям
 
 ---
-'''
+"""
 
     def generate_module_section(self, module_info: ModuleInfo) -> str:
         """Сгенерировать секцию для модуля"""
-        section = f'''## 📦 Модуль: {module_info.name}
+        section = f"""## 📦 Модуль: {module_info.name}
 
 **📁 Путь:** `{module_info.path}`  
 **🎯 Назначение:** {module_info.purpose}
 
-'''
+"""
 
         if module_info.dependencies:
             section += f"**🔗 Внешние зависимости:** `{'`, `'.join(module_info.dependencies)}`\n\n"
@@ -288,7 +313,7 @@ class AIManualGenerator:
             section += "📝 *Модуль пока не содержит Python файлов*\n\n"
             return section
 
-        section += f"**📊 Статистика:**\n"
+        section += "**📊 Статистика:**\n"
         total_functions = sum(len(f.functions) for f in module_info.files)
         total_classes = sum(len(f.classes) for f in module_info.files)
         total_lines = sum(f.size for f in module_info.files)
@@ -299,7 +324,9 @@ class AIManualGenerator:
         section += f"- Строк кода: {total_lines}\n\n"
 
         # Информация по файлам
-        for file_info in sorted(module_info.files, key=lambda x: x.complexity_score, reverse=True):
+        for file_info in sorted(
+            module_info.files, key=lambda x: x.complexity_score, reverse=True
+        ):
             section += self.generate_file_section(file_info)
 
         return section
@@ -323,20 +350,24 @@ class AIManualGenerator:
         if file_info.functions:
             section += "**⚡ Функции:**\n"
             for func in file_info.functions:
-                if not func.startswith('_'):  # Показываем только публичные
+                if not func.startswith("_"):  # Показываем только публичные
                     section += f"- `{func}()`\n"
             section += "\n"
 
         if file_info.imports:
-            important_imports = [imp for imp in file_info.imports if not imp.startswith('.')][:5]
+            important_imports = [
+                imp for imp in file_info.imports if not imp.startswith(".")
+            ][:5]
             if important_imports:
-                section += f"**📦 Основные импорты:** `{'`, `'.join(important_imports)}`\n\n"
+                section += (
+                    f"**📦 Основные импорты:** `{'`, `'.join(important_imports)}`\n\n"
+                )
 
         return section
 
     def generate_architecture_section(self, modules: Dict[str, ModuleInfo]) -> str:
         """Сгенерировать секцию архитектуры"""
-        section = '''## 🏗️ Архитектура проекта
+        section = """## 🏗️ Архитектура проекта
 
 ### Слои архитектуры
 
@@ -366,15 +397,15 @@ class AIManualGenerator:
 
 ### Ключевые компоненты
 
-'''
+"""
 
         # Основные компоненты
-        key_modules = ['repositories', 'services', 'filters', 'cache', 'audit']
+        key_modules = ["repositories", "services", "filters", "cache", "audit"]
         for module_name, module_info in modules.items():
             if any(key in module_name.lower() for key in key_modules):
                 section += f"**{module_info.name}:** {module_info.purpose}\n\n"
 
-        section += '''### Паттерны использования
+        section += """### Паттерны использования
 
 ```python
 # 1. Создание Repository
@@ -395,13 +426,13 @@ users = await repo.query()\\
     .find_all()
 ```
 
-'''
+"""
 
         return section
 
     def generate_usage_examples(self, modules: Dict[str, ModuleInfo]) -> str:
         """Сгенерировать примеры использования"""
-        section = '''## 💡 Примеры использования
+        section = """## 💡 Примеры использования
 
 ### Базовая работа с Repository
 
@@ -473,7 +504,7 @@ async def get_users(
     return {"items": users, "total": total}
 ```
 
-'''
+"""
 
         return section
 
@@ -634,13 +665,13 @@ poetry publish
         # Добавляем руководство по разработке
         sections.append(self.generate_development_guidelines())
 
-        return '\n'.join(sections)
+        return "\n".join(sections)
 
     def save_manual(self, output_file: str = "dplex_AI_MANUAL.md") -> None:
         """Сохранить мануал в файл"""
         manual_content = self.generate_manual()
 
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write(manual_content)
 
         print(f"✅ Мануал сохранен в файл: {output_file}")
@@ -653,7 +684,10 @@ def main():
     print("=" * 50)
 
     # Определяем корневую директорию проекта
-    project_root = input("📁 Путь к проекту (по умолчанию '../../dplex'): ").strip() or "../../dplex"
+    project_root = (
+        input("📁 Путь к проекту (по умолчанию '../../dplex'): ").strip()
+        or "../../dplex"
+    )
 
     if not Path(project_root).exists():
         print(f"❌ Директория {project_root} не найдена!")
@@ -664,14 +698,16 @@ def main():
 
     # Генерируем и сохраняем мануал
     try:
-        output_file = input("📄 Имя выходного файла (по умолчанию 'dplex_AI_MANUAL.md'): ").strip()
+        output_file = input(
+            "📄 Имя выходного файла (по умолчанию 'dplex_AI_MANUAL.md'): "
+        ).strip()
         if not output_file:
             output_file = "dplex_AI_MANUAL.md"
 
         generator.save_manual(output_file)
 
         print("\n🎉 Готово!")
-        print(f"📖 Мануал готов к использованию ИИ ассистентами")
+        print("📖 Мануал готов к использованию ИИ ассистентами")
         print(f"📁 Файл: {Path(output_file).absolute()}")
 
     except Exception as e:

@@ -1,9 +1,9 @@
 import uuid
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic
 
 from sqlalchemy import select, func, and_, delete, ColumnElement, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute
+from sqlalchemy.orm import InstrumentedAttribute
 
 from dplex import QueryBuilder
 from dplex.types import ModelType, KeyType
@@ -132,5 +132,3 @@ class BaseRepository(Generic[ModelType, KeyType]):
 
         result = await self.session.execute(stmt)
         return result.scalar_one()
-
-

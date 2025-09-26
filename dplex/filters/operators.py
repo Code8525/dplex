@@ -3,12 +3,13 @@
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 @dataclass
 class NumericFilter(Generic[T]):
     """Numeric filter operators"""
+
     eq: T | None = None
     ne: T | None = None
     gt: T | None = None
@@ -21,6 +22,7 @@ class NumericFilter(Generic[T]):
 @dataclass
 class StringFilter:
     """String filter operators"""
+
     eq: str | None = None
     ne: str | None = None
     like: str | None = None
@@ -28,7 +30,8 @@ class StringFilter:
     in_: list[str] | None = None
 
 
-@dataclass  
+@dataclass
 class BoolFilter:
     """Boolean filter operators"""
+
     eq: bool | None = None

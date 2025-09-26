@@ -1,6 +1,6 @@
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic
 from sqlalchemy import ColumnElement
-from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute
+from sqlalchemy.orm import InstrumentedAttribute
 
 from dplex import BaseRepository
 from dplex.types import ModelType
@@ -178,7 +178,6 @@ class QueryBuilder(Generic[ModelType]):
 
     async def find_one(self) -> ModelType | None:
         """Выполнить запрос и вернуть первый результат"""
-        original_limit = self.limit_value
         self.limit_value = 1
         results = await self.find_all()
         return results[0] if results else None

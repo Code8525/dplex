@@ -11,8 +11,7 @@ from dplex.services import BaseService
 
 __all__ = [
     "BaseRepository",
-    "QueryBuilder", 
+    "QueryBuilder",
     "BaseService",
     "FilterSchema",
 ]
-
