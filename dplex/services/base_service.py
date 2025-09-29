@@ -1,8 +1,8 @@
-from typing import Any, Generic, TypeVar, Literal
+from typing import Any, Generic, TypeVar, Literal, get_args
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dplex import BaseRepository
@@ -13,14 +13,14 @@ CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 ResponseSchemaType = TypeVar("ResponseSchemaType", bound=BaseModel)
 FilterSchemaType = TypeVar("FilterSchemaType", bound="BaseFilter")
-SortFieldSchemaType = TypeVar("SortFieldSchemaType", bound=str)
+SortFieldSchemaType = TypeVar("SortFieldSchemaType")
 
 
 class SortDirection(str, Enum):
     """Направления сортировки"""
 
-    ASC = "asc"
-    DESC = "desc"
+    ASC = "ASC"
+    DESC = "DESC"
 
 
 class StringFilter(BaseModel):
@@ -371,29 +371,8 @@ class BaseService(
         pass
 
     @abstractmethod
-    def _parse_sort_field(self, sort_field: SortFieldSchemaType) -> list[str]:
-        """Распарсить поле сортировки в список имен колонок.
-
-        Этот метод должен быть реализован в наследниках для определения
-        того, как конкретный тип сортировки преобразуется в колонки модели.
-
-        Args:
-            sort_field: Значение поля сортировки (например, Literal или enum)
-
-        Returns:
-            Список имен колонок модели для сортировки
-
-        Example:
-            # Для простого случая (один к одному):
-            def _parse_sort_field(self, sort_field: UserSortField) -> list[str]:
-                return [sort_field]
-
-            # Для составной сортировки:
-            def _parse_sort_field(self, sort_field: UserSortField) -> list[str]:
-                if sort_field == "full_name":
-                    return ["first_name", "last_name"]
-                return [sort_field]
-        """
+    def _sort_field_to_column_name(self, sort_field: SortFieldSchemaType) -> str:
+        """Преобразовать поле сортировки из схемы в имя колонки модели"""
         pass
 
     def _get_model_column(self, field_name: str) -> Any:
@@ -404,30 +383,42 @@ class BaseService(
             )
         return getattr(self.repository.model, field_name)
 
+    def _normalize_sort_fields(
+        self, sort_field: SortFieldSchemaType | list[SortFieldSchemaType] | None
+    ) -> list[SortFieldSchemaType]:
+        """Нормализовать поля сортировки в список"""
+        if sort_field is None:
+            return []
+        if isinstance(sort_field, list):
+            return sort_field
+        return [sort_field]
+
     def _get_sort_fields_from_filter(
         self, filter_data: FilterSchemaType
     ) -> list[tuple[str, SortDirection]]:
         """Получить список полей сортировки из фильтра"""
-        if not hasattr(filter_data, "sort_field") or filter_data.sort_field is None:
+        if not hasattr(filter_data, "sort_field"):
             return []
 
-        sort_field = filter_data.sort_field
+        sort_fields = self._normalize_sort_fields(filter_data.sort_field)
+        if not sort_fields:
+            return []
+
         sort_direction = getattr(filter_data, "sort_direction", SortDirection.ASC)
 
-        # Используем абстрактный метод для парсинга
-        column_names = self._parse_sort_field(sort_field)
+        result = []
+        for field in sort_fields:
+            column_name = self._sort_field_to_column_name(field)
+            result.append((column_name, sort_direction))
 
-        # Применяем одно направление ко всем колонкам
-        return [(col_name, sort_direction) for col_name in column_names]
+        return result
 
     def _apply_base_filters(
         self, query_builder: Any, filter_data: FilterSchemaType
     ) -> Any:
         """Применить базовые фильтры (limit, offset, sort)"""
-        # Применяем пользовательские фильтры
         query_builder = self._apply_filter_to_query(query_builder, filter_data)
 
-        # Применяем сортировку
         sort_fields = self._get_sort_fields_from_filter(filter_data)
         for field_name, direction in sort_fields:
             column = self._get_model_column(field_name)
