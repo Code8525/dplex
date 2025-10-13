@@ -2,16 +2,14 @@ from typing import Any, Generic
 from sqlalchemy import ColumnElement
 from sqlalchemy.orm import InstrumentedAttribute
 
-from dplex import BaseRepository
+from dplex.repositories.repository import DPRepo
 from dplex.types import ModelType
 
 
 class QueryBuilder(Generic[ModelType]):
     """Query Builder с улучшенной типизацией"""
 
-    def __init__(
-        self, repo: BaseRepository[ModelType, Any], model: type[ModelType]
-    ) -> None:
+    def __init__(self, repo: DPRepo[ModelType, Any], model: type[ModelType]) -> None:
         self.repo = repo
         self.model = model
         self.filters: list[ColumnElement[bool]] = []

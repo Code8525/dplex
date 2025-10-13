@@ -5,7 +5,7 @@ from sqlalchemy import select, func, and_, delete, ColumnElement, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
-from dplex import QueryBuilder
+from dplex.repositories.query_builder import QueryBuilder
 from dplex.types import ModelType, KeyType
 
 
@@ -23,7 +23,6 @@ class DPRepo(Generic[ModelType, KeyType]):
         self.session = session
         self.key_type = key_type
         self.id_field_name = id_field_name
-        # ✅ Кешируем ID колонку при инициализации
         self._id_column = self._get_id_column()
 
     def _get_id_column(self) -> InstrumentedAttribute[KeyType]:

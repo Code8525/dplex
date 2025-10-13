@@ -4,7 +4,7 @@ from typing import Any, Generic
 from abc import ABC, abstractmethod
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dplex.repositories.base_repository import DPRepo
+from dplex.repositories.repository import DPRepo
 from dplex.services.filter_applier import FilterApplier
 from dplex.types import (
     ModelType,
