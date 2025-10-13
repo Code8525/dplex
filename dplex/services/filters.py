@@ -1,87 +1,217 @@
-"""Типизированные операторы фильтрации для временных данных"""
+"""Типизированные операторы фильтрации для всех типов данных"""
 
-from dataclasses import dataclass
-from datetime import datetime, date
-from typing import Generic, TypeVar
+from datetime import datetime, date, time
+from decimal import Decimal
+from enum import Enum
+from typing import Generic, TypeVar, Any
 
-# Определяем типы для временных данных
+# Определяем типы для различных данных
 T = TypeVar("T")
+EnumT = TypeVar("EnumT", bound=Enum)
 
 
-@dataclass
-class NumberFilter(Generic[T]):
+class BaseNumberFilter(Generic[T]):
     """
-    Фильтр для числовых полей (int, float, Decimal и т.д.)
+    Базовый фильтр для числовых полей
 
-    Позволяет фильтровать числовые данные используя различные операторы сравнения,
-    проверки вхождения в диапазон и списки значений.
+    Базовый класс для всех числовых фильтров.
+    Предоставляет общий набор операторов для работы с числами.
+    Не используется напрямую - только как родительский класс.
+
+    Type Parameters:
+        T: Тип числовых данных (int, float, Decimal и т.д.)
+    """
+
+    def __init__(
+        self,
+        eq: T | None = None,
+        ne: T | None = None,
+        gt: T | None = None,
+        gte: T | None = None,
+        lt: T | None = None,
+        lte: T | None = None,
+        between: tuple[T, T] | None = None,
+        in_: list[T] | None = None,
+        not_in: list[T] | None = None,
+        is_null: bool | None = None,
+        is_not_null: bool | None = None,
+    ) -> None:
+        self.eq = eq
+        """Равно (equal). Ищет точное совпадение значения. Пример: age == 25"""
+
+        self.ne = ne
+        """Не равно (not equal). Исключает точное значение. Пример: status != 0"""
+
+        self.gt = gt
+        """Больше чем (greater than). Пример: price > 100.50"""
+
+        self.gte = gte
+        """Больше или равно (greater than or equal). Пример: age >= 18"""
+
+        self.lt = lt
+        """Меньше чем (less than). Пример: quantity < 10"""
+
+        self.lte = lte
+        """Меньше или равно (less than or equal). Пример: discount <= 50.0"""
+
+        self.between = between
+        """
+        В диапазоне (between). Проверяет, находится ли значение между двумя границами (включительно).
+        Пример: price BETWEEN 10.0 AND 100.0 → between=(10.0, 100.0)
+        """
+
+        self.in_ = in_
+        """
+        Входит в список (in). Проверяет, содержится ли значение в заданном списке.
+        Пример: rating IN (1, 2, 3, 4, 5) → in_=[1, 2, 3, 4, 5]
+        """
+
+        self.not_in = not_in
+        """
+        Не входит в список (not in). Исключает значения из заданного списка.
+        Пример: id NOT IN (5, 10, 15) → not_in=[5, 10, 15]
+        """
+
+        self.is_null = is_null
+        """
+        Является NULL (is null). Проверяет, что значение равно NULL.
+        Пример: discount IS NULL → is_null=True
+        """
+
+        self.is_not_null = is_not_null
+        """
+        Не является NULL (is not null). Проверяет, что значение не равно NULL.
+        Пример: price IS NOT NULL → is_not_null=True
+        """
+
+
+class IntFilter(BaseNumberFilter[int]):
+    """
+    Фильтр для целых чисел (int)
+
+    Специализированный фильтр для работы с целыми числами.
+    Используется для счетчиков, идентификаторов, количества, возраста и т.д.
 
     Примеры использования:
-        # Поиск возраста от 18 до 65
-        age_filter = NumericFilter[int](gte=18, lte=65)
+        # Фильтр по возрасту
+        age_filter = IntFilter(gte=18, lte=65)
 
-        # Поиск цены в диапазоне
-        price_filter = NumericFilter[float](between=(10.0, 100.0))
+        # Фильтр по количеству
+        quantity_filter = IntFilter(gt=0, lt=100)
 
         # Исключение определенных значений
-        exclude_filter = NumericFilter[int](not_in=[13, 666])
+        exclude_filter = IntFilter(not_in=[13, 666])
+
+        # Диапазон значений
+        range_filter = IntFilter(between=(10, 50))
+
+        # Точное значение
+        exact_filter = IntFilter(eq=42)
+
+    Применение:
+        - Возраст пользователей
+        - Количество товаров
+        - Счетчики (просмотры, лайки)
+        - Рейтинги (1-5 звезд)
+        - Идентификаторы (не UUID)
     """
 
-    # Операторы равенства
-    eq: T | None = None
-    """Равно (equal). Ищет точное совпадение значения. Пример: age == 25"""
+    pass
 
-    ne: T | None = None
-    """Не равно (not equal). Исключает точное значение. Пример: status != 0"""
 
-    # Операторы сравнения
-    gt: T | None = None
-    """Больше чем (greater than). Пример: price > 100"""
-
-    gte: T | None = None
-    """Больше или равно (greater than or equal). Пример: age >= 18"""
-
-    lt: T | None = None
-    """Меньше чем (less than). Пример: quantity < 10"""
-
-    lte: T | None = None
-    """Меньше или равно (less than or equal). Пример: discount <= 50"""
-
-    # Операторы диапазона
-    between: tuple[T, T] | None = None
+class FloatFilter(BaseNumberFilter[float]):
     """
-    В диапазоне (between). Проверяет, находится ли значение между двумя границами (включительно).
-    Пример: price BETWEEN 10 AND 100 → between=(10, 100)
-    """
+    Фильтр для чисел с плавающей точкой (float)
 
-    # Операторы коллекций
-    in_: list[T] | None = None
-    """
-    Входит в список (in). Проверяет, содержится ли значение в заданном списке.
-    Пример: status IN (1, 2, 3) → in_=[1, 2, 3]
-    """
+    Специализированный фильтр для работы с числами с плавающей точкой.
+    Используется для измерений, процентов, коэффициентов и приблизительных значений.
 
-    not_in: list[T] | None = None
-    """
-    Не входит в список (not in). Исключает значения из заданного списка.
-    Пример: id NOT IN (5, 10, 15) → not_in=[5, 10, 15]
-    """
+    Примеры использования:
+        # Фильтр по цене
+        price_filter = FloatFilter(gte=10.99, lte=99.99)
 
-    # Проверки на NULL
-    is_null: bool | None = None
-    """
-    Является NULL (is null). Проверяет, что значение равно NULL.
-    Пример: discount IS NULL → is_null=True
+        # Фильтр по рейтингу
+        rating_filter = FloatFilter(gte=4.0)
+
+        # Фильтр по проценту скидки
+        discount_filter = FloatFilter(between=(5.0, 50.0))
+
+        # Температура в диапазоне
+        temperature_filter = FloatFilter(gt=-10.5, lt=35.7)
+
+        # Вес товара
+        weight_filter = FloatFilter(lte=25.5)
+
+    Применение:
+        - Цены (с копейками)
+        - Рейтинги (4.5 звезд)
+        - Проценты (скидки, налоги)
+        - Физические измерения (вес, длина)
+        - Координаты (широта, долгота)
+        - Коэффициенты и соотношения
+
+    Примечание:
+        Для точных финансовых расчетов рекомендуется использовать DecimalFilter
+        вместо FloatFilter для избежания ошибок округления.
     """
 
-    is_not_null: bool | None = None
-    """
-    Не является NULL (is not null). Проверяет, что значение не равно NULL.
-    Пример: price IS NOT NULL → is_not_null=True
-    """
+    pass
 
 
-@dataclass
+class DecimalFilter(BaseNumberFilter[Decimal]):
+    """
+    Фильтр для точных десятичных чисел (Decimal)
+
+    Специализированный фильтр для работы с типом Decimal.
+    Используется для финансовых расчетов где требуется точность.
+    Избегает проблем с округлением, характерных для float.
+
+    Примеры использования:
+        from decimal import Decimal
+
+        # Фильтр по точной сумме
+        amount_filter = DecimalFilter(
+            gte=Decimal("100.00"),
+            lte=Decimal("1000.00")
+        )
+
+        # Фильтр по балансу счета
+        balance_filter = DecimalFilter(gt=Decimal("0.00"))
+
+        # Точная цена
+        price_filter = DecimalFilter(eq=Decimal("19.99"))
+
+        # Диапазон комиссий
+        commission_filter = DecimalFilter(
+            between=(Decimal("0.01"), Decimal("5.00"))
+        )
+
+        # Исключить нулевые суммы
+        non_zero_filter = DecimalFilter(ne=Decimal("0.00"))
+
+    Применение:
+        - Финансовые суммы (платежи, счета)
+        - Балансы счетов
+        - Цены товаров (точные)
+        - Налоги и комиссии
+        - Курсы валют
+        - Любые расчеты требующие точности
+
+    Преимущества перед FloatFilter:
+        - Точность до указанного знака
+        - Нет ошибок округления
+        - Соответствие бухгалтерским стандартам
+        - Предсказуемые результаты вычислений
+    """
+
+    pass
+
+
+# Для обратной совместимости и удобства
+NumberFilter = BaseNumberFilter
+"""Алиас для BaseNumberFilter для обратной совместимости"""
+
+
 class StringFilter:
     """
     Фильтр для строковых полей с поддержкой паттернов
@@ -100,91 +230,100 @@ class StringFilter:
         status_filter = StringFilter(not_in=["deleted", "banned"])
     """
 
-    # Операторы равенства
-    eq: str | None = None
-    """
-    Равно (equal). Точное совпадение строки (с учетом регистра).
-    Пример: name = 'John' → eq="John"
-    """
+    def __init__(
+        self,
+        eq: str | None = None,
+        ne: str | None = None,
+        like: str | None = None,
+        ilike: str | None = None,
+        contains: str | None = None,
+        icontains: str | None = None,
+        starts_with: str | None = None,
+        ends_with: str | None = None,
+        in_: list[str] | None = None,
+        not_in: list[str] | None = None,
+        is_null: bool | None = None,
+        is_not_null: bool | None = None,
+    ) -> None:
+        self.eq = eq
+        """
+        Равно (equal). Точное совпадение строки (с учетом регистра).
+        Пример: name = 'John' → eq="John"
+        """
 
-    ne: str | None = None
-    """
-    Не равно (not equal). Исключает точное совпадение строки.
-    Пример: status != 'deleted' → ne="deleted"
-    """
+        self.ne = ne
+        """
+        Не равно (not equal). Исключает точное совпадение строки.
+        Пример: status != 'deleted' → ne="deleted"
+        """
 
-    # Поиск по шаблону (SQL LIKE)
-    like: str | None = None
-    """
-    Соответствует шаблону (like). SQL LIKE оператор с учетом регистра.
-    Используйте % для любых символов, _ для одного символа.
-    Пример: name LIKE 'John%' → like="John%"
-    """
+        self.like = like
+        """
+        Соответствует шаблону (like). SQL LIKE оператор с учетом регистра.
+        Используйте % для любых символов, _ для одного символа.
+        Пример: name LIKE 'John%' → like="John%"
+        """
 
-    ilike: str | None = None
-    """
-    Соответствует шаблону без учета регистра (ilike). SQL ILIKE оператор.
-    Используйте % для любых символов, _ для одного символа.
-    Пример: email ILIKE '%@GMAIL.COM' → ilike="%@gmail.com"
-    """
+        self.ilike = ilike
+        """
+        Соответствует шаблону без учета регистра (ilike). SQL ILIKE оператор.
+        Используйте % для любых символов, _ для одного символа.
+        Пример: email ILIKE '%@GMAIL.COM' → ilike="%@gmail.com"
+        """
 
-    # Удобные операторы поиска подстроки
-    contains: str | None = None
-    """
-    Содержит подстроку (contains). С учетом регистра.
-    Эквивалентно LIKE '%value%'.
-    Пример: description содержит "python" → contains="python"
-    """
+        self.contains = contains
+        """
+        Содержит подстроку (contains). С учетом регистра.
+        Эквивалентно LIKE '%value%'.
+        Пример: description содержит "python" → contains="python"
+        """
 
-    icontains: str | None = None
-    """
-    Содержит подстроку без учета регистра (icontains).
-    Эквивалентно ILIKE '%value%'.
-    Пример: title содержит "API" → icontains="api"
-    """
+        self.icontains = icontains
+        """
+        Содержит подстроку без учета регистра (icontains).
+        Эквивалентно ILIKE '%value%'.
+        Пример: title содержит "API" → icontains="api"
+        """
 
-    starts_with: str | None = None
-    """
-    Начинается с (starts with). С учетом регистра.
-    Эквивалентно LIKE 'value%'.
-    Пример: url начинается с "https://" → starts_with="https://"
-    """
+        self.starts_with = starts_with
+        """
+        Начинается с (starts with). С учетом регистра.
+        Эквивалентно LIKE 'value%'.
+        Пример: url начинается с "https://" → starts_with="https://"
+        """
 
-    ends_with: str | None = None
-    """
-    Заканчивается на (ends with). С учетом регистра.
-    Эквивалентно LIKE '%value'.
-    Пример: filename заканчивается на ".pdf" → ends_with=".pdf"
-    """
+        self.ends_with = ends_with
+        """
+        Заканчивается на (ends with). С учетом регистра.
+        Эквивалентно LIKE '%value'.
+        Пример: filename заканчивается на ".pdf" → ends_with=".pdf"
+        """
 
-    # Операторы коллекций
-    in_: list[str] | None = None
-    """
-    Входит в список (in). Проверяет, содержится ли строка в заданном списке.
-    Пример: status IN ('active', 'pending') → in_=["active", "pending"]
-    """
+        self.in_ = in_
+        """
+        Входит в список (in). Проверяет, содержится ли строка в заданном списке.
+        Пример: status IN ('active', 'pending') → in_=["active", "pending"]
+        """
 
-    not_in: list[str] | None = None
-    """
-    Не входит в список (not in). Исключает строки из заданного списка.
-    Пример: role NOT IN ('admin', 'moderator') → not_in=["admin", "moderator"]
-    """
+        self.not_in = not_in
+        """
+        Не входит в список (not in). Исключает строки из заданного списка.
+        Пример: role NOT IN ('admin', 'moderator') → not_in=["admin", "moderator"]
+        """
 
-    # Проверки на NULL
-    is_null: bool | None = None
-    """
-    Является NULL (is null). Проверяет, что значение равно NULL.
-    Пример: middle_name IS NULL → is_null=True
-    """
+        self.is_null = is_null
+        """
+        Является NULL (is null). Проверяет, что значение равно NULL.
+        Пример: middle_name IS NULL → is_null=True
+        """
 
-    is_not_null: bool | None = None
-    """
-    Не является NULL (is not null). Проверяет, что значение не равно NULL.
-    Пример: email IS NOT NULL → is_not_null=True
-    """
+        self.is_not_null = is_not_null
+        """
+        Не является NULL (is not null). Проверяет, что значение не равно NULL.
+        Пример: email IS NOT NULL → is_not_null=True
+        """
 
 
-@dataclass
 class BooleanFilter:
     """
     Фильтр для булевых полей (True/False)
@@ -194,44 +333,48 @@ class BooleanFilter:
 
     Примеры использования:
         # Поиск активных записей
-        active_filter = BoolFilter(eq=True)
+        active_filter = BooleanFilter(eq=True)
 
         # Исключить удаленные записи
-        not_deleted_filter = BoolFilter(ne=True)
+        not_deleted_filter = BooleanFilter(ne=True)
 
         # Найти записи где поле не установлено
-        undefined_filter = BoolFilter(is_null=True)
+        undefined_filter = BooleanFilter(is_null=True)
     """
 
-    # Операторы равенства
-    eq: bool | None = None
-    """
-    Равно (equal). Проверяет точное совпадение булевого значения.
-    Пример: is_active = True → eq=True
-    """
+    def __init__(
+        self,
+        eq: bool | None = None,
+        ne: bool | None = None,
+        is_null: bool | None = None,
+        is_not_null: bool | None = None,
+    ) -> None:
+        self.eq = eq
+        """
+        Равно (equal). Проверяет точное совпадение булевого значения.
+        Пример: is_active = True → eq=True
+        """
 
-    ne: bool | None = None
-    """
-    Не равно (not equal). Исключает булевое значение.
-    Пример: is_deleted != True → ne=True (то же что и eq=False)
-    """
+        self.ne = ne
+        """
+        Не равно (not equal). Исключает булевое значение.
+        Пример: is_deleted != True → ne=True (то же что и eq=False)
+        """
 
-    # Проверки на NULL
-    is_null: bool | None = None
-    """
-    Является NULL (is null). Проверяет, что значение равно NULL.
-    Полезно для опциональных булевых полей.
-    Пример: is_verified IS NULL → is_null=True
-    """
+        self.is_null = is_null
+        """
+        Является NULL (is null). Проверяет, что значение равно NULL.
+        Полезно для опциональных булевых полей.
+        Пример: is_verified IS NULL → is_null=True
+        """
 
-    is_not_null: bool | None = None
-    """
-    Не является NULL (is not null). Проверяет, что значение установлено (True или False).
-    Пример: is_confirmed IS NOT NULL → is_not_null=True
-    """
+        self.is_not_null = is_not_null
+        """
+        Не является NULL (is not null). Проверяет, что значение установлено (True или False).
+        Пример: is_confirmed IS NOT NULL → is_not_null=True
+        """
 
 
-@dataclass
 class BaseDateTimeFilter(Generic[T]):
     """
     Базовый фильтр для временных данных (datetime, date, time)
@@ -243,97 +386,107 @@ class BaseDateTimeFilter(Generic[T]):
         T: Тип временных данных (datetime, date, time и т.д.)
     """
 
-    # Операторы равенства
-    eq: T | None = None
-    """
-    Равно (equal). Точное совпадение даты/времени.
-    Пример: created_at = '2024-01-01' → eq=datetime(2024, 1, 1)
-    """
+    def __init__(
+        self,
+        eq: T | None = None,
+        ne: T | None = None,
+        gt: T | None = None,
+        gte: T | None = None,
+        lt: T | None = None,
+        lte: T | None = None,
+        between: tuple[T, T] | None = None,
+        from_: T | None = None,
+        to: T | None = None,
+        in_: list[T] | None = None,
+        not_in: list[T] | None = None,
+        is_null: bool | None = None,
+        is_not_null: bool | None = None,
+    ) -> None:
+        self.eq = eq
+        """
+        Равно (equal). Точное совпадение даты/времени.
+        Пример: created_at = '2024-01-01' → eq=datetime(2024, 1, 1)
+        """
 
-    ne: T | None = None
-    """
-    Не равно (not equal). Исключает точную дату/время.
-    Пример: updated_at != '2024-01-01' → ne=datetime(2024, 1, 1)
-    """
+        self.ne = ne
+        """
+        Не равно (not equal). Исключает точную дату/время.
+        Пример: updated_at != '2024-01-01' → ne=datetime(2024, 1, 1)
+        """
 
-    # Операторы сравнения
-    gt: T | None = None
-    """
-    Больше чем (greater than). Позже указанной даты/времени.
-    Пример: created_at > '2024-01-01' → gt=datetime(2024, 1, 1)
-    """
+        self.gt = gt
+        """
+        Больше чем (greater than). Позже указанной даты/времени.
+        Пример: created_at > '2024-01-01' → gt=datetime(2024, 1, 1)
+        """
 
-    gte: T | None = None
-    """
-    Больше или равно (greater than or equal). Начиная с указанной даты/времени.
-    Пример: event_date >= '2024-01-01' → gte=datetime(2024, 1, 1)
-    """
+        self.gte = gte
+        """
+        Больше или равно (greater than or equal). Начиная с указанной даты/времени.
+        Пример: event_date >= '2024-01-01' → gte=datetime(2024, 1, 1)
+        """
 
-    lt: T | None = None
-    """
-    Меньше чем (less than). Раньше указанной даты/времени.
-    Пример: expires_at < '2024-12-31' → lt=datetime(2024, 12, 31)
-    """
+        self.lt = lt
+        """
+        Меньше чем (less than). Раньше указанной даты/времени.
+        Пример: expires_at < '2024-12-31' → lt=datetime(2024, 12, 31)
+        """
 
-    lte: T | None = None
-    """
-    Меньше или равно (less than or equal). До указанной даты/времени включительно.
-    Пример: deadline <= '2024-12-31' → lte=datetime(2024, 12, 31)
-    """
+        self.lte = lte
+        """
+        Меньше или равно (less than or equal). До указанной даты/времени включительно.
+        Пример: deadline <= '2024-12-31' → lte=datetime(2024, 12, 31)
+        """
 
-    # Операторы диапазона
-    between: tuple[T, T] | None = None
-    """
-    В диапазоне (between). Между двумя датами/временем включительно.
-    Пример: created_at BETWEEN '2024-01-01' AND '2024-12-31'
-    → between=(datetime(2024, 1, 1), datetime(2024, 12, 31))
-    """
+        self.between = between
+        """
+        В диапазоне (between). Между двумя датами/временем включительно.
+        Пример: created_at BETWEEN '2024-01-01' AND '2024-12-31'
+        → between=(datetime(2024, 1, 1), datetime(2024, 12, 31))
+        """
 
-    from_: T | None = None
-    """
-    От даты (from). Удобный алиас для gte (больше или равно).
-    Более читаемый способ указать начало периода.
-    Пример: from_=datetime(2024, 1, 1) эквивалентно gte=datetime(2024, 1, 1)
-    """
+        self.from_ = from_
+        """
+        От даты (from). Удобный алиас для gte (больше или равно).
+        Более читаемый способ указать начало периода.
+        Пример: from_=datetime(2024, 1, 1) эквивалентно gte=datetime(2024, 1, 1)
+        """
 
-    to: T | None = None
-    """
-    До даты (to). Удобный алиас для lte (меньше или равно).
-    Более читаемый способ указать конец периода.
-    Пример: to=datetime(2024, 12, 31) эквивалентно lte=datetime(2024, 12, 31)
-    """
+        self.to = to
+        """
+        До даты (to). Удобный алиас для lte (меньше или равно).
+        Более читаемый способ указать конец периода.
+        Пример: to=datetime(2024, 12, 31) эквивалентно lte=datetime(2024, 12, 31)
+        """
 
-    # Операторы коллекций
-    in_: list[T] | None = None
-    """
-    Входит в список (in). Проверяет совпадение с одним из значений в списке.
-    Пример: event_date IN ('2024-01-01', '2024-06-01')
-    → in_=[datetime(2024, 1, 1), datetime(2024, 6, 1)]
-    """
+        self.in_ = in_
+        """
+        Входит в список (in). Проверяет совпадение с одним из значений в списке.
+        Пример: event_date IN ('2024-01-01', '2024-06-01')
+        → in_=[datetime(2024, 1, 1), datetime(2024, 6, 1)]
+        """
 
-    not_in: list[T] | None = None
-    """
-    Не входит в список (not in). Исключает определенные даты/время.
-    Пример: birthday NOT IN ('2024-01-01', '2024-12-25')
-    → not_in=[datetime(2024, 1, 1), datetime(2024, 12, 25)]
-    """
+        self.not_in = not_in
+        """
+        Не входит в список (not in). Исключает определенные даты/время.
+        Пример: birthday NOT IN ('2024-01-01', '2024-12-25')
+        → not_in=[datetime(2024, 1, 1), datetime(2024, 12, 25)]
+        """
 
-    # Проверки на NULL
-    is_null: bool | None = None
-    """
-    Является NULL (is null). Проверяет, что дата/время не установлены.
-    Полезно для опциональных временных полей.
-    Пример: deleted_at IS NULL → is_null=True
-    """
+        self.is_null = is_null
+        """
+        Является NULL (is null). Проверяет, что дата/время не установлены.
+        Полезно для опциональных временных полей.
+        Пример: deleted_at IS NULL → is_null=True
+        """
 
-    is_not_null: bool | None = None
-    """
-    Не является NULL (is not null). Проверяет, что дата/время установлены.
-    Пример: completed_at IS NOT NULL → is_not_null=True
-    """
+        self.is_not_null = is_not_null
+        """
+        Не является NULL (is not null). Проверяет, что дата/время установлены.
+        Пример: completed_at IS NOT NULL → is_not_null=True
+        """
 
 
-@dataclass
 class DateFilter(BaseDateTimeFilter[date]):
     """
     Фильтр для полей с датой (без времени)
@@ -368,7 +521,6 @@ class DateFilter(BaseDateTimeFilter[date]):
     pass
 
 
-@dataclass
 class DateTimeFilter(BaseDateTimeFilter[datetime]):
     """
     Фильтр для полей с датой и временем
@@ -410,7 +562,6 @@ class DateTimeFilter(BaseDateTimeFilter[datetime]):
     pass
 
 
-@dataclass
 class TimestampFilter(BaseDateTimeFilter[int]):
     """
     Фильтр для Unix timestamp (целочисленные метки времени)
@@ -450,3 +601,214 @@ class TimestampFilter(BaseDateTimeFilter[int]):
     """
 
     pass
+
+
+class TimeFilter(BaseDateTimeFilter[time]):
+    """
+    Фильтр для полей со временем (без даты)
+
+    Специализированный фильтр для работы только со временем (time).
+    Использует тип time из модуля datetime, игнорирует дату.
+    Полезен для фильтрации по времени суток независимо от даты.
+
+    Примеры использования:
+        from datetime import time
+
+        # Рабочие часы (с 9:00 до 18:00)
+        work_hours = TimeFilter(
+            gte=time(9, 0, 0),
+            lt=time(18, 0, 0)
+        )
+
+        # Точное время
+        exact_time = TimeFilter(eq=time(12, 30, 0))
+
+        # Утренние события (до полудня)
+        morning = TimeFilter(lt=time(12, 0, 0))
+
+        # Вечерние события (после 18:00)
+        evening = TimeFilter(gte=time(18, 0, 0))
+
+    Применение:
+        - Расписания и графики работы
+        - Временные слоты для бронирования
+        - Фильтрация событий по времени суток
+        - Часы работы магазинов/сервисов
+    """
+
+    pass
+
+
+class EnumFilter(Generic[EnumT]):
+    """
+    Фильтр для Enum полей
+
+    Специализированный фильтр для работы с перечислениями (Enum).
+    Поддерживает фильтрацию по значениям enum, проверку вхождения в список
+    и проверку на NULL.
+
+    Примеры использования:
+        from enum import Enum
+
+        class UserRole(str, Enum):
+            ADMIN = "admin"
+            USER = "user"
+            GUEST = "guest"
+            MODERATOR = "moderator"
+
+        class OrderStatus(str, Enum):
+            PENDING = "pending"
+            PROCESSING = "processing"
+            SHIPPED = "shipped"
+            DELIVERED = "delivered"
+            CANCELLED = "cancelled"
+
+        # Фильтр по конкретной роли
+        admin_filter = EnumFilter[UserRole](eq=UserRole.ADMIN)
+
+        # Фильтр по нескольким статусам
+        active_orders = EnumFilter[OrderStatus](
+            in_=[OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.SHIPPED]
+        )
+
+        # Исключить определенные статусы
+        not_completed = EnumFilter[OrderStatus](
+            not_in=[OrderStatus.DELIVERED, OrderStatus.CANCELLED]
+        )
+
+        # Исключить гостей
+        registered_users = EnumFilter[UserRole](ne=UserRole.GUEST)
+
+    Преимущества использования с Enum:
+        - Типобезопасность на этапе разработки
+        - IDE подсказывает доступные значения enum
+        - Невозможно передать некорректное значение
+        - Явная семантика кода
+    """
+
+    def __init__(
+        self,
+        eq: EnumT | None = None,
+        ne: EnumT | None = None,
+        in_: list[EnumT] | None = None,
+        not_in: list[EnumT] | None = None,
+        is_null: bool | None = None,
+        is_not_null: bool | None = None,
+    ) -> None:
+        self.eq = eq
+        """
+        Равно (equal). Точное совпадение со значением enum.
+        Пример: role = UserRole.ADMIN → eq=UserRole.ADMIN
+        """
+
+        self.ne = ne
+        """
+        Не равно (not equal). Исключает конкретное значение enum.
+        Пример: status != OrderStatus.CANCELLED → ne=OrderStatus.CANCELLED
+        """
+
+        self.in_ = in_
+        """
+        Входит в список (in). Проверяет, является ли значение одним из указанных enum.
+        Пример: status IN (PENDING, PROCESSING) → in_=[OrderStatus.PENDING, OrderStatus.PROCESSING]
+        """
+
+        self.not_in = not_in
+        """
+        Не входит в список (not in). Исключает указанные значения enum.
+        Пример: role NOT IN (GUEST, BANNED) → not_in=[UserRole.GUEST, UserRole.BANNED]
+        """
+
+        self.is_null = is_null
+        """
+        Является NULL (is null). Проверяет, что значение enum не установлено.
+        Пример: role IS NULL → is_null=True
+        """
+
+        self.is_not_null = is_not_null
+        """
+        Не является NULL (is not null). Проверяет, что значение enum установлено.
+        Пример: status IS NOT NULL → is_not_null=True
+        """
+
+
+class UUIDFilter:
+    """
+    Фильтр для UUID полей
+
+    Специализированный фильтр для работы с UUID (Universally Unique Identifier).
+    Поддерживает проверку на равенство, вхождение в список и проверку на NULL.
+
+    Примеры использования:
+        from uuid import UUID
+
+        # Фильтр по конкретному UUID
+        user_id = UUID("123e4567-e89b-12d3-a456-426614174000")
+        id_filter = UUIDFilter(eq=user_id)
+
+        # Фильтр по нескольким UUID
+        user_ids = [
+            UUID("123e4567-e89b-12d3-a456-426614174000"),
+            UUID("223e4567-e89b-12d3-a456-426614174001"),
+        ]
+        multiple_ids = UUIDFilter(in_=user_ids)
+
+        # Исключить определенные UUID
+        exclude_ids = UUIDFilter(
+            not_in=[UUID("323e4567-e89b-12d3-a456-426614174002")]
+        )
+
+        # Проверка на установленный ID
+        has_id = UUIDFilter(is_not_null=True)
+
+    Применение:
+        - Первичные ключи в базах данных
+        - Идентификаторы пользователей
+        - Идентификаторы сессий
+        - Уникальные идентификаторы документов
+    """
+
+    def __init__(
+        self,
+        eq: Any | None = None,  # UUID type
+        ne: Any | None = None,
+        in_: list[Any] | None = None,
+        not_in: list[Any] | None = None,
+        is_null: bool | None = None,
+        is_not_null: bool | None = None,
+    ) -> None:
+        self.eq = eq
+        """
+        Равно (equal). Точное совпадение с UUID.
+        Пример: id = UUID(...) → eq=UUID("123e4567-...")
+        """
+
+        self.ne = ne
+        """
+        Не равно (not equal). Исключает конкретный UUID.
+        Пример: id != UUID(...) → ne=UUID("123e4567-...")
+        """
+
+        self.in_ = in_
+        """
+        Входит в список (in). Проверяет вхождение UUID в список.
+        Пример: id IN (...) → in_=[UUID("123..."), UUID("456...")]
+        """
+
+        self.not_in = not_in
+        """
+        Не входит в список (not in). Исключает указанные UUID.
+        Пример: id NOT IN (...) → not_in=[UUID("123..."), UUID("456...")]
+        """
+
+        self.is_null = is_null
+        """
+        Является NULL (is null). Проверяет, что UUID не установлен.
+        Пример: parent_id IS NULL → is_null=True
+        """
+
+        self.is_not_null = is_not_null
+        """
+        Не является NULL (is not null). Проверяет, что UUID установлен.
+        Пример: user_id IS NOT NULL → is_not_null=True
+        """

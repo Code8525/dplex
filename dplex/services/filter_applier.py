@@ -1,12 +1,25 @@
+# file: dplex/services/filter_applier.py
 import datetime
+from decimal import Decimal
+from enum import Enum
 from typing import Any, Protocol
+from uuid import UUID
 
 from dplex.services.base_filterable_fields import BaseFilterableFields
 from dplex.services.filters import (
     StringFilter,
-    DateTimeFilter,
-    NumberFilter,
     BooleanFilter,
+    BaseNumberFilter,
+    IntFilter,
+    FloatFilter,
+    DecimalFilter,
+    BaseDateTimeFilter,
+    DateTimeFilter,
+    DateFilter,
+    TimeFilter,
+    TimestampFilter,
+    EnumFilter,
+    UUIDFilter,
 )
 from dplex.types import FilterType
 
@@ -50,29 +63,37 @@ class FilterApplier:
     )
 
     # Comparison operation keys for type detection
-    _COMPARISON_OPS = frozenset(["gt", "gte", "lt", "lte", "between"])
+    _COMPARISON_OPS = frozenset(["gt", "gte", "lt", "lte", "between", "from_", "to"])
 
     @staticmethod
     def _apply_common_ops(
         query_builder: SupportsFiltering, column: Any, filter_data: FilterType
     ) -> SupportsFiltering:
         """Применить общие операции фильтрации (eq, ne, in_, not_in, is_null, is_not_null)"""
-        if filter_data.eq is not None:
+        if hasattr(filter_data, "eq") and filter_data.eq is not None:
             query_builder = query_builder.where_eq(column, filter_data.eq)
 
-        if filter_data.ne is not None:
+        if hasattr(filter_data, "ne") and filter_data.ne is not None:
             query_builder = query_builder.where_ne(column, filter_data.ne)
 
-        if filter_data.in_ is not None:
+        if hasattr(filter_data, "in_") and filter_data.in_ is not None:
             query_builder = query_builder.where_in(column, filter_data.in_)
 
-        if filter_data.not_in is not None:
+        if hasattr(filter_data, "not_in") and filter_data.not_in is not None:
             query_builder = query_builder.where_not_in(column, filter_data.not_in)
 
-        if filter_data.is_null is not None and filter_data.is_null:
+        if (
+            hasattr(filter_data, "is_null")
+            and filter_data.is_null is not None
+            and filter_data.is_null
+        ):
             query_builder = query_builder.where_is_null(column)
 
-        if filter_data.is_not_null is not None and filter_data.is_not_null:
+        if (
+            hasattr(filter_data, "is_not_null")
+            and filter_data.is_not_null is not None
+            and filter_data.is_not_null
+        ):
             query_builder = query_builder.where_is_not_null(column)
 
         return query_builder
@@ -81,24 +102,31 @@ class FilterApplier:
     def _apply_comparison_ops(
         query_builder: SupportsFiltering,
         column: Any,
-        filter_data: NumberFilter | DateTimeFilter,
+        filter_data: Any,  # BaseNumberFilter or BaseDateTimeFilter
     ) -> SupportsFiltering:
         """Применить операции сравнения (gt, gte, lt, lte, between)"""
-        if filter_data.gt is not None:
+        if hasattr(filter_data, "gt") and filter_data.gt is not None:
             query_builder = query_builder.where_gt(column, filter_data.gt)
 
-        if filter_data.gte is not None:
+        if hasattr(filter_data, "gte") and filter_data.gte is not None:
             query_builder = query_builder.where_gte(column, filter_data.gte)
 
-        if filter_data.lt is not None:
+        if hasattr(filter_data, "lt") and filter_data.lt is not None:
             query_builder = query_builder.where_lt(column, filter_data.lt)
 
-        if filter_data.lte is not None:
+        if hasattr(filter_data, "lte") and filter_data.lte is not None:
             query_builder = query_builder.where_lte(column, filter_data.lte)
 
-        if filter_data.between is not None:
+        if hasattr(filter_data, "between") and filter_data.between is not None:
             start, end = filter_data.between
             query_builder = query_builder.where_between(column, start, end)
+
+        # Обработка алиасов from_ и to для BaseDateTimeFilter
+        if hasattr(filter_data, "from_") and filter_data.from_ is not None:
+            query_builder = query_builder.where_gte(column, filter_data.from_)
+
+        if hasattr(filter_data, "to") and filter_data.to is not None:
+            query_builder = query_builder.where_lte(column, filter_data.to)
 
         return query_builder
 
@@ -143,18 +171,24 @@ class FilterApplier:
         query_builder = self._apply_string_ops(query_builder, column, filter_data)
         return query_builder
 
-    def apply_number_filter(
-        self, query_builder: SupportsFiltering, column: Any, filter_data: NumberFilter
+    def apply_base_number_filter(
+        self,
+        query_builder: SupportsFiltering,
+        column: Any,
+        filter_data: BaseNumberFilter,
     ) -> SupportsFiltering:
-        """Применить числовой фильтр"""
+        """Применить базовый числовой фильтр (работает для Int, Float, Decimal)"""
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         query_builder = self._apply_comparison_ops(query_builder, column, filter_data)
         return query_builder
 
-    def apply_datetime_filter(
-        self, query_builder: SupportsFiltering, column: Any, filter_data: DateTimeFilter
+    def apply_base_datetime_filter(
+        self,
+        query_builder: SupportsFiltering,
+        column: Any,
+        filter_data: BaseDateTimeFilter,
     ) -> SupportsFiltering:
-        """Применить фильтр даты/времени"""
+        """Применить базовый фильтр даты/времени (работает для DateTime, Date, Time, Timestamp)"""
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         query_builder = self._apply_comparison_ops(query_builder, column, filter_data)
         return query_builder
@@ -163,6 +197,20 @@ class FilterApplier:
         self, query_builder: SupportsFiltering, column: Any, filter_data: BooleanFilter
     ) -> SupportsFiltering:
         """Применить булевый фильтр"""
+        query_builder = self._apply_common_ops(query_builder, column, filter_data)
+        return query_builder
+
+    def apply_enum_filter(
+        self, query_builder: SupportsFiltering, column: Any, filter_data: EnumFilter
+    ) -> SupportsFiltering:
+        """Применить enum фильтр"""
+        query_builder = self._apply_common_ops(query_builder, column, filter_data)
+        return query_builder
+
+    def apply_uuid_filter(
+        self, query_builder: SupportsFiltering, column: Any, filter_data: UUIDFilter
+    ) -> SupportsFiltering:
+        """Применить UUID фильтр"""
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         return query_builder
 
@@ -228,20 +276,44 @@ class FilterApplier:
         filter_instance = filter_type(**field_value)
 
         # Применяем соответствующий метод в зависимости от типа фильтра
+
+        # Строковые фильтры
         if filter_type == StringFilter:
             return self.apply_string_filter(query_builder, column, filter_instance)
-        elif filter_type == NumberFilter:
-            return self.apply_number_filter(query_builder, column, filter_instance)
-        elif filter_type == DateTimeFilter:
-            return self.apply_datetime_filter(query_builder, column, filter_instance)
+
+        # Булевые фильтры
         elif filter_type == BooleanFilter:
             return self.apply_boolean_filter(query_builder, column, filter_instance)
+
+        # Числовые фильтры (используем базовый метод для всех)
+        elif filter_type in (IntFilter, FloatFilter, DecimalFilter, BaseNumberFilter):
+            return self.apply_base_number_filter(query_builder, column, filter_instance)
+
+        # Фильтры даты/времени (используем базовый метод для всех)
+        elif filter_type in (
+            DateTimeFilter,
+            DateFilter,
+            TimeFilter,
+            TimestampFilter,
+            BaseDateTimeFilter,
+        ):
+            return self.apply_base_datetime_filter(
+                query_builder, column, filter_instance
+            )
+
+        # Enum фильтры
+        elif filter_type == EnumFilter:
+            return self.apply_enum_filter(query_builder, column, filter_instance)
+
+        # UUID фильтры
+        elif filter_type == UUIDFilter:
+            return self.apply_uuid_filter(query_builder, column, filter_instance)
 
         return query_builder
 
     def _detect_filter_type(
         self, field_value: dict[str, Any]
-    ) -> type[StringFilter | NumberFilter | DateTimeFilter | BooleanFilter] | None:
+    ) -> type[FilterType] | None:
         """
         Определить тип фильтра по структуре данных
 
@@ -257,7 +329,7 @@ class FilterApplier:
         if any(key in field_value for key in self._STRING_OPS):
             return StringFilter
 
-        # Если есть операции сравнения - определяем NumberFilter или DateTimeFilter
+        # Если есть операции сравнения - определяем числовой или временной фильтр
         if any(key in field_value for key in self._COMPARISON_OPS):
             return self._detect_comparison_filter_type(field_value)
 
@@ -283,34 +355,60 @@ class FilterApplier:
     @staticmethod
     def _detect_comparison_filter_type(
         field_value: dict[str, Any],
-    ) -> type[NumberFilter | DateTimeFilter]:
+    ) -> type[FilterType]:
         """
-        Определить тип фильтра для операций сравнения (gt, gte, lt, lte, between)
+        Определить тип фильтра для операций сравнения (gt, gte, lt, lte, between, from_, to)
 
         Args:
             field_value: Словарь со значениями фильтра
 
         Returns:
-            NumberFilter или DateTimeFilter
+            Соответствующий класс фильтра
         """
         # Проверяем значения операций сравнения
-        for key in ["gt", "gte", "lt", "lte"]:
+        for key in ["gt", "gte", "lt", "lte", "from_", "to"]:
             if key in field_value and field_value[key] is not None:
                 value = field_value[key]
-                if isinstance(value, (datetime.datetime, datetime.date)):
+
+                # Проверяем тип значения
+                if isinstance(value, datetime.datetime):
                     return DateTimeFilter
-                return NumberFilter
+                elif isinstance(value, datetime.date):
+                    return DateFilter
+                elif isinstance(value, datetime.time):
+                    return TimeFilter
+                elif isinstance(value, Decimal):
+                    return DecimalFilter
+                elif isinstance(value, float):
+                    return FloatFilter
+                elif isinstance(value, int):
+                    # Может быть IntFilter или TimestampFilter
+                    # Если есть from_/to алиасы - скорее всего BaseDateTimeFilter
+                    if "from_" in field_value or "to" in field_value:
+                        return TimestampFilter
+                    return IntFilter
 
         # Проверяем between
         if "between" in field_value and field_value["between"] is not None:
             value = field_value["between"]
             if isinstance(value, (tuple, list)) and len(value) > 0:
-                if isinstance(value[0], (datetime.datetime, datetime.date)):
-                    return DateTimeFilter
-                return NumberFilter
+                first_val = value[0]
 
-        # По умолчанию NumberFilter
-        return NumberFilter
+                if isinstance(first_val, datetime.datetime):
+                    return DateTimeFilter
+                elif isinstance(first_val, datetime.date):
+                    return DateFilter
+                elif isinstance(first_val, datetime.time):
+                    return TimeFilter
+                elif isinstance(first_val, Decimal):
+                    return DecimalFilter
+                elif isinstance(first_val, float):
+                    return FloatFilter
+                elif isinstance(first_val, int):
+                    return IntFilter
+
+        # По умолчанию IntFilter
+        return IntFilter
 
     @staticmethod
     def _detect_filter_type_by_value(
@@ -325,13 +423,45 @@ class FilterApplier:
         Returns:
             Класс фильтра или None
         """
+        # Важно: порядок проверок имеет значение!
+        # bool является подклассом int, поэтому проверяем его первым
         if isinstance(value, bool):
             return BooleanFilter
+
+        # Проверяем Enum
+        elif isinstance(value, Enum):
+            return EnumFilter
+
+        # Проверяем UUID
+        elif isinstance(value, UUID):
+            return UUIDFilter
+
+        # Проверяем datetime (до date, т.к. datetime - подкласс date)
+        elif isinstance(value, datetime.datetime):
+            return DateTimeFilter
+
+        # Проверяем date
+        elif isinstance(value, datetime.date):
+            return DateFilter
+
+        # Проверяем time
+        elif isinstance(value, datetime.time):
+            return TimeFilter
+
+        # Проверяем Decimal (до float/int)
+        elif isinstance(value, Decimal):
+            return DecimalFilter
+
+        # Проверяем float (до int, т.к. порядок важен)
+        elif isinstance(value, float):
+            return FloatFilter
+
+        # Проверяем int
+        elif isinstance(value, int):
+            return IntFilter
+
+        # Проверяем str
         elif isinstance(value, str):
             return StringFilter
-        elif isinstance(value, (int, float)):
-            return NumberFilter
-        elif isinstance(value, (datetime.datetime, datetime.date)):
-            return DateTimeFilter
 
         return None

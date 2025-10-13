@@ -12,6 +12,13 @@ from dplex.services.filters import (
     BooleanFilter,
     DateFilter,
     TimestampFilter,
+    FloatFilter,
+    DecimalFilter,
+    BaseNumberFilter,
+    TimeFilter,
+    IntFilter,
+    EnumFilter,
+    UUIDFilter,
 )
 
 ModelType = TypeVar("ModelType", bound=DeclarativeBase)
@@ -27,11 +34,17 @@ SortFieldSchemaType = TypeVar("SortFieldSchemaType")
 
 FilterType = (
     StringFilter
-    | NumberFilter
+    | IntFilter
+    | FloatFilter
+    | DecimalFilter
+    | BaseNumberFilter
     | DateTimeFilter
     | DateFilter
+    | TimeFilter
     | TimestampFilter
     | BooleanFilter
+    | EnumFilter
+    | UUIDFilter
 )
 
 
