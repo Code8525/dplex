@@ -9,7 +9,7 @@ from dplex import QueryBuilder
 from dplex.types import ModelType, KeyType
 
 
-class BaseRepository(Generic[ModelType, KeyType]):
+class DPRepo(Generic[ModelType, KeyType]):
     """Базовый репозиторий с улучшенной типизацией"""
 
     def __init__(
