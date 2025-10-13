@@ -1,13 +1,14 @@
 from typing import Any, Generic
-from sqlalchemy import ColumnElement
+from sqlalchemy import ColumnElement, asc, desc, nullsfirst, nullslast
 from sqlalchemy.orm import InstrumentedAttribute
 
-from dplex.repositories.repository import DPRepo
-from dplex.types import ModelType
+from src.dplex.repositories.repository import DPRepo
+from src.dplex.services.sort import Sort, SortDirection, NullsPlacement
+from src.dplex.types import ModelType, SortFieldType
 
 
 class QueryBuilder(Generic[ModelType]):
-    """Query Builder с улучшенной типизацией"""
+    """Query Builder с улучшенной типизацией и поддержкой Sort"""
 
     def __init__(self, repo: DPRepo[ModelType, Any], model: type[ModelType]) -> None:
         self.repo = repo
@@ -140,16 +141,21 @@ class QueryBuilder(Generic[ModelType]):
             raise ValueError("Page must be >= 1")
         if per_page < 1:
             raise ValueError("Per page must be >= 1")
-
         self.limit_value = per_page
         self.offset_value = (page - 1) * per_page
         return self
 
     def order_by(
-        self, column: InstrumentedAttribute[Any], desc: bool = False
+        self, column: InstrumentedAttribute[Any], desc_order: bool = False
     ) -> "QueryBuilder[ModelType]":
-        """ORDER BY column"""
-        order_clause = column.desc() if desc else column.asc()
+        """
+        ORDER BY column
+
+        Args:
+            column: Колонка для сортировки
+            desc_order: True для DESC, False для ASC (по умолчанию)
+        """
+        order_clause = column.desc() if desc_order else column.asc()
         self.order_by_clauses.append(order_clause)
         return self
 
@@ -157,13 +163,103 @@ class QueryBuilder(Generic[ModelType]):
         self, column: InstrumentedAttribute[Any]
     ) -> "QueryBuilder[ModelType]":
         """ORDER BY column DESC"""
-        return self.order_by(column, desc=True)
+        return self.order_by(column, desc_order=True)
 
     def order_by_asc(
         self, column: InstrumentedAttribute[Any]
     ) -> "QueryBuilder[ModelType]":
         """ORDER BY column ASC"""
-        return self.order_by(column, desc=False)
+        return self.order_by(column, desc_order=False)
+
+    def order_by_with_nulls(
+        self,
+        column: InstrumentedAttribute[Any],
+        desc_order: bool = False,
+        nulls_placement: NullsPlacement | None = None,
+    ) -> "QueryBuilder[ModelType]":
+        """
+        ORDER BY column с управлением NULL значениями
+
+        Args:
+            column: Колонка для сортировки
+            desc_order: True для DESC, False для ASC
+            nulls_placement: Размещение NULL (FIRST или LAST)
+
+        Example:
+            qb.order_by_with_nulls(
+                User.created_at,
+                desc_order=True,
+                nulls_placement=NullsPlacement.LAST
+            )
+        """
+        # Создаем базовую сортировку
+        if desc_order:
+            order_clause = desc(column)
+        else:
+            order_clause = asc(column)
+
+        # Применяем nulls placement если указан
+        if nulls_placement == NullsPlacement.FIRST:
+            order_clause = nullsfirst(order_clause)
+        elif nulls_placement == NullsPlacement.LAST:
+            order_clause = nullslast(order_clause)
+
+        self.order_by_clauses.append(order_clause)
+        return self
+
+    def apply_sort(
+        self, sort_item: Sort[Any], column: InstrumentedAttribute[Any]
+    ) -> "QueryBuilder[ModelType]":
+        """
+        Применить Sort объект к query builder
+
+        Args:
+            sort_item: Объект Sort с параметрами сортировки
+            column: Колонка модели для сортировки
+
+        Example:
+            sort = Sort(
+                field=UserSortField.CREATED_AT,
+                direction=SortDirection.DESC,
+                nulls=NullsPlacement.LAST
+            )
+            qb.apply_sort(sort, User.created_at)
+        """
+        desc_order = sort_item.direction == SortDirection.DESC
+        return self.order_by_with_nulls(column, desc_order, sort_item.nulls)
+
+    def apply_sorts(
+        self,
+        sort_list: list[Sort[Any]],
+        column_mapper: dict[Any, InstrumentedAttribute[Any]],
+    ) -> "QueryBuilder[ModelType]":
+        """
+        Применить список Sort объектов к query builder
+
+        Args:
+            sort_list: Список объектов Sort
+            column_mapper: Словарь для маппинга field -> column
+                          {SortField.USERNAME: User.username, ...}
+
+        Example:
+            sorts = [
+                Sort(field=UserSortField.CREATED_AT, direction=SortDirection.DESC),
+                Sort(field=UserSortField.USERNAME, direction=SortDirection.ASC)
+            ]
+            mapper = {
+                UserSortField.CREATED_AT: User.created_at,
+                UserSortField.USERNAME: User.username
+            }
+            qb.apply_sorts(sorts, mapper)
+        """
+        for sort_item in sort_list:
+            column = column_mapper.get(sort_item.field)
+            if column is None:
+                raise ValueError(
+                    f"Column mapping not found for field: {sort_item.field}"
+                )
+            self.apply_sort(sort_item, column)
+        return self
 
     def clear_order(self) -> "QueryBuilder[ModelType]":
         """Очистить сортировку"""

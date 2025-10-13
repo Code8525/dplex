@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dplex.repositories.repository import DPRepo
 from dplex.services.filter_applier import FilterApplier
+from dplex.services.sort import Sort, SortDirection, NullsPlacement
 from dplex.types import (
     ModelType,
     KeyType,
@@ -14,7 +15,6 @@ from dplex.types import (
     ResponseSchemaType,
     FilterSchemaType,
     SortFieldSchemaType,
-    SortDirection,
 )
 
 
@@ -173,54 +173,70 @@ class DPService(
             )
         return getattr(self.repository.model, field_name)
 
-    def _normalize_sort_fields(
-        self, sort_field: SortFieldSchemaType | list[SortFieldSchemaType] | None
-    ) -> list[SortFieldSchemaType]:
+    def _normalize_sort_list(
+        self, sort: list[Sort[SortFieldSchemaType]] | Sort[SortFieldSchemaType] | None
+    ) -> list[Sort[SortFieldSchemaType]]:
         """
-        Нормализовать поля сортировки в список
+        Нормализовать сортировку в список
 
         Args:
-            sort_field: Одно поле, список полей или None
+            sort: Один элемент Sort, список Sort или None
 
         Returns:
-            Список полей сортировки (может быть пустым)
+            Список элементов сортировки (может быть пустым)
         """
-        if sort_field is None:
+        if sort is None:
             return []
-        if isinstance(sort_field, list):
-            return sort_field
-        return [sort_field]
+        if isinstance(sort, list):
+            return sort
+        return [sort]
 
-    def _get_sort_fields_from_filter(
-        self, filter_data: FilterSchemaType
-    ) -> list[tuple[str, SortDirection]]:
+    def _apply_sort_to_query(
+        self,
+        query_builder: Any,
+        sort_list: list[Sort[SortFieldSchemaType]],
+    ) -> Any:
         """
-        Извлечь поля сортировки из схемы фильтра
+        Применить сортировку к query builder
+
+        Args:
+            query_builder: QueryBuilder для добавления сортировки
+            sort_list: Список элементов сортировки
+
+        Returns:
+            QueryBuilder с примененной сортировкой
+        """
+        for sort_item in sort_list:
+            column_name = self._sort_field_to_column_name(sort_item.field)
+            column = self._get_model_column(column_name)
+
+            desc_order = sort_item.direction == SortDirection.DESC
+
+            # Используем order_by_with_nulls для поддержки nulls placement
+            query_builder = query_builder.order_by_with_nulls(
+                column, desc_order=desc_order, nulls_placement=sort_item.nulls
+            )
+
+        return query_builder
+
+    def _get_sort_from_filter(
+        self, filter_data: FilterSchemaType
+    ) -> list[Sort[SortFieldSchemaType]]:
+        """
+        Извлечь сортировку из схемы фильтра
 
         Args:
             filter_data: Схема фильтра
 
         Returns:
-            Список кортежей (имя_колонки, направление_сортировки)
+            Список элементов Sort
         """
-        # Проверяем наличие поля sort_field в фильтре
-        if not hasattr(filter_data, "sort_field"):
+        # Проверяем наличие поля sort в фильтре
+        if not hasattr(filter_data, "sort"):
             return []
 
-        sort_fields = self._normalize_sort_fields(filter_data.sort_field)
-        if not sort_fields:
-            return []
-
-        # Получаем направление сортировки (по умолчанию ASC)
-        sort_direction = getattr(filter_data, "sort_direction", SortDirection.ASC)
-
-        # Преобразуем поля в имена колонок
-        result = []
-        for field in sort_fields:
-            column_name = self._sort_field_to_column_name(field)
-            result.append((column_name, sort_direction))
-
-        return result
+        sort_value = getattr(filter_data, "sort", None)
+        return self._normalize_sort_list(sort_value)
 
     def _make_update_dict(
         self,
@@ -272,12 +288,10 @@ class DPService(
         # 1. Применяем кастомные фильтры
         query_builder = self._apply_filter_to_query(query_builder, filter_data)
 
-        # 2. Применяем сортировку
-        sort_fields = self._get_sort_fields_from_filter(filter_data)
-        for field_name, direction in sort_fields:
-            column = self._get_model_column(field_name)
-            desc = direction == SortDirection.DESC
-            query_builder = query_builder.order_by(column, desc=desc)
+        # 2. Применяем сортировку из Sort объектов
+        sort_list = self._get_sort_from_filter(filter_data)
+        if sort_list:
+            query_builder = self._apply_sort_to_query(query_builder, sort_list)
 
         # 3. Применяем limit
         if hasattr(filter_data, "limit") and filter_data.limit is not None:

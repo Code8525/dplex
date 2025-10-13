@@ -1,5 +1,5 @@
 import uuid
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import TypeVar, Union, Any
 
 from pydantic import BaseModel
@@ -29,8 +29,10 @@ CreateSchemaType = TypeVar("CreateSchemaType")
 UpdateSchemaType = TypeVar("UpdateSchemaType")
 FilterSchemaType = TypeVar("FilterSchemaType")
 
-AnyKeyType = Union[int, str, uuid.UUID]
 SortFieldSchemaType = TypeVar("SortFieldSchemaType")
+
+# Generic type для поля сортировки
+SortFieldType = TypeVar("SortFieldType", bound=StrEnum)
 
 FilterType = (
     StringFilter
@@ -46,10 +48,3 @@ FilterType = (
     | EnumFilter
     | UUIDFilter
 )
-
-
-class SortDirection(str, Enum):
-    """Направления сортировки"""
-
-    ASC = "ASC"
-    DESC = "DESC"
