@@ -71,7 +71,28 @@ class UserSortField(StrEnum):
 
 
 class UserFilters(DPFilters[UserSortField]):
-    # ИМЕНА ПОЛЕЙ == колонкам SQLAlchemy, чтобы FilterApplier всё применил автоматически
+    """
+    Набор фильтров для выборки пользователей.
+
+    Позволяет выполнять фильтрацию по основным атрибутам модели `User`,
+    включая точное совпадение, частичный поиск по строкам и фильтрацию по диапазону дат.
+
+    Пример использования:
+        filters = UserFilters(
+            name=StringFilter(icontains="иван"),
+            created_at=DateTimeFilter(gte=datetime(2024, 1, 1))
+        )
+
+    :param user_id: Фильтр по уникальному идентификатору пользователя (`UUIDFilter`).
+                    Пример: `UUIDFilter(eq="550e8400-e29b-41d4-a716-446655440000")`
+    :param name: Фильтр по имени пользователя (`StringFilter`).
+                 Поддерживает операторы `eq`, `ne`, `like`, `ilike`, `contains`, `icontains`, `in`, `not_in`.
+    :param email: Фильтр по адресу электронной почты (`StringFilter`).
+                  Аналогично `name`, можно искать по шаблону или подстроке.
+    :param created_at: Фильтр по дате создания (`DateTimeFilter`).
+                       Поддерживает `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `between`.
+    """
+
     user_id: UUIDFilter | None = None
     name: StringFilter | None = None
     email: StringFilter | None = None
@@ -119,7 +140,6 @@ async def example_flow(session: AsyncSession) -> None:
 
     # ---- Read (list с фильтрами + сортировкой + пагинацией)
     filters = UserFilters(
-        name=StringFilter(icontains="иван"),
         email=StringFilter(ends_with="@mail.ru"),
         sort=[  # можно список Sort(...) для multi-sort
             Sort(
@@ -129,6 +149,7 @@ async def example_flow(session: AsyncSession) -> None:
         ],
         limit=50,
         offset=0,
+        user_id=UUIDFilter(eq=u.user_id),
     )
     users = await service.get_all(filters)
     print("Found:", users)
