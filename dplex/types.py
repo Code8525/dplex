@@ -32,7 +32,7 @@ FilterSchemaType = TypeVar("FilterSchemaType")
 SortFieldSchemaType = TypeVar("SortFieldSchemaType")
 
 # Generic type для поля сортировки
-SortFieldType = TypeVar("SortFieldType", bound=StrEnum)
+SortByType = TypeVar("SortByType", bound=StrEnum)
 
 FilterType = (
     StringFilter

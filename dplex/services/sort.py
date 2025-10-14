@@ -1,11 +1,11 @@
 from enum import StrEnum
 from dataclasses import dataclass
-from typing import TypeVar, Generic
+from typing import Generic
 
-from dplex.types import SortFieldType
+from dplex.types import SortByType
 
 
-class SortDirection(StrEnum):
+class Order(StrEnum):
     ASC = "asc"
     DESC = "desc"
 
@@ -16,9 +16,9 @@ class NullsPlacement(StrEnum):
 
 
 @dataclass(frozen=True)
-class Sort(Generic[SortFieldType]):
+class Sort(Generic[SortByType]):
     """Элемент сортировки"""
 
-    field: SortFieldType
-    direction: SortDirection = SortDirection.ASC
+    by: SortByType
+    order: Order = Order.ASC
     nulls: NullsPlacement | None = None

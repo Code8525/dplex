@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Protocol
 from uuid import UUID
 
-from dplex.services.base_filterable_fields import BaseFilterableFields
+from dplex.services.dp_filters import DPFilters
 from dplex.services.filters import (
     StringFilter,
     BooleanFilter,
@@ -218,7 +218,7 @@ class FilterApplier:
         self,
         query_builder: SupportsFiltering,
         model: type,
-        filterable_fields: BaseFilterableFields,
+        filterable_fields: DPFilters,
     ) -> SupportsFiltering:
         """
         Применить все фильтры из схемы FilterableFields автоматически
@@ -226,7 +226,7 @@ class FilterApplier:
         Args:
             query_builder: Query builder для применения фильтров
             model: SQLAlchemy модель с колонками
-            filterable_fields: Схема с фильтрами (наследуется от BaseFilterableFields)
+            filterable_fields: Схема с фильтрами (наследуется от DPFilters)
 
         Returns:
             Query builder с примененными фильтрами

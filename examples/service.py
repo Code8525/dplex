@@ -16,11 +16,11 @@ from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 
 from dplex import NULL  # Импорт маркера NULL
 from dplex.types import NullMarker  # Для type hints
-from dplex.repositories.repository import DPRepo
-from dplex.services.base_filterable_fields import BaseFilterableFields
+from dplex.repositories.dp_repo import DPRepo
+from dplex.services.dp_filters import DPFilters
 from dplex.services.dp_service import DPService
 from dplex.services.filters import StringFilter, IntFilter, DateTimeFilter
-from dplex.services.sort import Sort, SortDirection
+from dplex.services.sort import Sort, Order
 
 
 # ==================== МОДЕЛИ И СХЕМЫ ====================
@@ -102,7 +102,7 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class UserFilterableFields(BaseFilterableFields[UserSortField]):
+class UserFilterableFields(DPFilters[UserSortField]):
     """Схема для фильтрации пользователей"""
 
     name: StringFilter | None = None
@@ -306,9 +306,7 @@ async def example_get_all_with_sort(service: UserService) -> None:
     print("\n=== READ: Сортировка ===")
 
     # Сортировка по возрасту (по убыванию)
-    filters = UserFilterableFields(
-        sort=Sort(field=UserSortField.AGE, direction=SortDirection.DESC)
-    )
+    filters = UserFilterableFields(sort=Sort(by=UserSortField.AGE, order=Order.DESC))
     users = await service.get_all(filters)
 
     print("Пользователи, отсортированные по возрасту (убывание):")
@@ -318,8 +316,8 @@ async def example_get_all_with_sort(service: UserService) -> None:
     # Множественная сортировка
     filters = UserFilterableFields(
         sort=[
-            Sort(field=UserSortField.AGE, direction=SortDirection.DESC),
-            Sort(field=UserSortField.NAME, direction=SortDirection.ASC),
+            Sort(by=UserSortField.AGE, order=Order.DESC),
+            Sort(by=UserSortField.NAME, order=Order.ASC),
         ]
     )
     users = await service.get_all(filters)
@@ -340,7 +338,7 @@ async def example_get_all_with_pagination(service: UserService) -> None:
     filters = UserFilterableFields(
         limit=5,
         offset=0,
-        sort=Sort(field=UserSortField.ID, direction=SortDirection.ASC),
+        sort=Sort(by=UserSortField.ID, order=Order.ASC),
     )
     users = await service.get_all(filters)
 
@@ -688,7 +686,7 @@ async def example_paginate(service: UserService) -> None:
     per_page = 5
 
     filters = UserFilterableFields(
-        sort=Sort(field=UserSortField.CREATED_AT, direction=SortDirection.DESC)
+        sort=Sort(by=UserSortField.CREATED_AT, order=Order.DESC)
     )
 
     users, total_count = await service.paginate(page, per_page, filters)
@@ -712,7 +710,7 @@ async def example_paginate_with_filters(service: UserService) -> None:
 
     filters = UserFilterableFields(
         age=IntFilter(gte=18),
-        sort=Sort(field=UserSortField.AGE, direction=SortDirection.DESC),
+        sort=Sort(by=UserSortField.AGE, order=Order.DESC),
     )
 
     users, total_count = await service.paginate(1, 5, filters)

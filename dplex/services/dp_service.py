@@ -4,10 +4,10 @@ from typing import Any, Generic
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
-from dplex.repositories.repository import DPRepo
+from dplex.repositories.dp_repo import DPRepo
 from dplex.services.filter_applier import FilterApplier
-from dplex.services.base_filterable_fields import BaseFilterableFields
-from dplex.services.sort import Sort, SortDirection
+from dplex.services.dp_filters import DPFilters
+from dplex.services.sort import Sort, Order
 from dplex.types import (
     ModelType,
     KeyType,
@@ -36,9 +36,9 @@ class DPService(
 
     ВСЁ работает автоматически:
     ✓ Создание моделей из схем (автоматически по полям)
-    ✓ Применение фильтров (автоматически через BaseFilterableFields)
+    ✓ Применение фильтров (автоматически через DPFilters)
     ✓ Сортировка (автоматически по именам enum)
-    ✓ Пагинация (автоматически через limit/offset в BaseFilterableFields)
+    ✓ Пагинация (автоматически через limit/offset в DPFilters)
     ✓ CRUD операции
     ✓ Установка NULL через маркер NULL
 
@@ -50,7 +50,7 @@ class DPService(
         CreateSchemaType: Pydantic схема для создания
         UpdateSchemaType: Pydantic схема для обновления
         ResponseSchemaType: Pydantic схема для ответа
-        FilterSchemaType: Схема фильтрации (наследник BaseFilterableFields)
+        FilterSchemaType: Схема фильтрации (наследник DPFilters)
         SortFieldSchemaType: Enum полей для сортировки
     """
 
@@ -102,10 +102,10 @@ class DPService(
         """
         АВТОМАТИЧЕСКОЕ применение фильтров к query builder
 
-        Работает с BaseFilterableFields - автоматически применяет все активные фильтры.
+        Работает с DPFilters - автоматически применяет все активные фильтры.
         """
-        # Если filter_data это наследник BaseFilterableFields
-        if isinstance(filter_data, BaseFilterableFields):
+        # Если filter_data это наследник DPFilters
+        if isinstance(filter_data, DPFilters):
             # Автоматически применяем все активные фильтры
             query_builder = self.filter_applier.apply_filters_from_schema(
                 query_builder, self.repository.model, filter_data
@@ -176,10 +176,10 @@ class DPService(
             QueryBuilder с примененной сортировкой
         """
         for sort_item in sort_list:
-            column_name = self._sort_field_to_column_name(sort_item.field)
+            column_name = self._sort_field_to_column_name(sort_item.by)
             column = self._get_model_column(column_name)
 
-            desc_order = sort_item.direction == SortDirection.DESC
+            desc_order = sort_item.order == Order.DESC
 
             # Используем order_by_with_nulls для поддержки nulls placement
             query_builder = query_builder.order_by_with_nulls(
@@ -192,7 +192,7 @@ class DPService(
         self, filter_data: FilterSchemaType
     ) -> list[Sort[SortFieldSchemaType]]:
         """
-        Извлечь сортировку из схемы фильтра (BaseFilterableFields)
+        Извлечь сортировку из схемы фильтра (DPFilters)
 
         Args:
             filter_data: Схема фильтра
@@ -200,11 +200,11 @@ class DPService(
         Returns:
             Список элементов Sort
         """
-        # BaseFilterableFields гарантирует наличие поля sort
-        if isinstance(filter_data, BaseFilterableFields):
+        # DPFilters гарантирует наличие поля sort
+        if isinstance(filter_data, DPFilters):
             return self._normalize_sort_list(filter_data.sort)
 
-        # Fallback для старых схем без BaseFilterableFields
+        # Fallback для старых схем без DPFilters
         if hasattr(filter_data, "sort"):
             return self._normalize_sort_list(filter_data.sort)
 
@@ -291,11 +291,11 @@ class DPService(
         """
         Применить базовые фильтры: фильтрация, сортировка, limit, offset
 
-        АВТОМАТИЧЕСКИ извлекает всё из BaseFilterableFields.
+        АВТОМАТИЧЕСКИ извлекает всё из DPFilters.
 
         Args:
             query_builder: QueryBuilder
-            filter_data: Схема фильтра (BaseFilterableFields)
+            filter_data: Схема фильтра (DPFilters)
 
         Returns:
             QueryBuilder с примененными фильтрами
@@ -303,23 +303,17 @@ class DPService(
         # 1. Применяем кастомные фильтры (автоматически)
         query_builder = self._apply_filter_to_query(query_builder, filter_data)
 
-        # 2. Применяем сортировку из Sort объектов (автоматически из BaseFilterableFields)
+        # 2. Применяем сортировку из Sort объектов (автоматически из DPFilters)
         sort_list = self._get_sort_from_filter(filter_data)
         if sort_list:
             query_builder = self._apply_sort_to_query(query_builder, sort_list)
 
-        # 3. Применяем limit (автоматически из BaseFilterableFields)
-        if (
-            isinstance(filter_data, BaseFilterableFields)
-            and filter_data.limit is not None
-        ):
+        # 3. Применяем limit (автоматически из DPFilters)
+        if isinstance(filter_data, DPFilters) and filter_data.limit is not None:
             query_builder = query_builder.limit(filter_data.limit)
 
-        # 4. Применяем offset (автоматически из BaseFilterableFields)
-        if (
-            isinstance(filter_data, BaseFilterableFields)
-            and filter_data.offset is not None
-        ):
+        # 4. Применяем offset (автоматически из DPFilters)
+        if isinstance(filter_data, DPFilters) and filter_data.offset is not None:
             query_builder = query_builder.offset(filter_data.offset)
 
         return query_builder
@@ -370,10 +364,10 @@ class DPService(
         """
         Получить все сущности с фильтрацией и сортировкой
 
-        АВТОМАТИЧЕСКИ применяет все фильтры, сортировку, limit и offset из BaseFilterableFields.
+        АВТОМАТИЧЕСКИ применяет все фильтры, сортировку, limit и offset из DPFilters.
 
         Args:
-            filter_data: Схема фильтра с параметрами поиска (BaseFilterableFields)
+            filter_data: Схема фильтра с параметрами поиска (DPFilters)
 
         Returns:
             Список схем ответа
@@ -695,12 +689,12 @@ class DPService(
         """
         Пагинация с фильтрацией и сортировкой
 
-        АВТОМАТИЧЕСКИ использует BaseFilterableFields для фильтрации и сортировки.
+        АВТОМАТИЧЕСКИ использует DPFilters для фильтрации и сортировки.
 
         Args:
             page: Номер страницы (начиная с 1)
             per_page: Количество элементов на странице
-            filter_data: Схема фильтра (BaseFilterableFields)
+            filter_data: Схема фильтра (DPFilters)
 
         Returns:
             Кортеж (список_данных, общее_количество)
@@ -723,8 +717,8 @@ class DPService(
             # Fallback для не-Pydantic объектов
             paginated_filter = filter_data
 
-        # Устанавливаем limit и offset в BaseFilterableFields
-        if isinstance(paginated_filter, BaseFilterableFields):
+        # Устанавливаем limit и offset в DPFilters
+        if isinstance(paginated_filter, DPFilters):
             paginated_filter.limit = per_page
             paginated_filter.offset = (page - 1) * per_page
 

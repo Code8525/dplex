@@ -3,11 +3,11 @@ from sqlalchemy import ColumnElement, asc, desc, nullsfirst, nullslast
 from sqlalchemy.orm import InstrumentedAttribute
 
 
-from dplex.services.sort import Sort, SortDirection, NullsPlacement
+from dplex.services.sort import Sort, Order, NullsPlacement
 from dplex.types import ModelType
 
 if TYPE_CHECKING:
-    from dplex.repositories.repository import DPRepo
+    from dplex.repositories.dp_repo import DPRepo
 
 
 class QueryBuilder(Generic[ModelType]):
@@ -223,12 +223,12 @@ class QueryBuilder(Generic[ModelType]):
         Example:
             sort = Sort(
                 field=UserSortField.CREATED_AT,
-                direction=SortDirection.DESC,
+                order=Order.DESC,
                 nulls=NullsPlacement.LAST
             )
             qb.apply_sort(sort, User.created_at)
         """
-        desc_order = sort_item.direction == SortDirection.DESC
+        desc_order = sort_item.order == Order.DESC
         return self.order_by_with_nulls(column, desc_order, sort_item.nulls)
 
     def apply_sorts(
@@ -246,8 +246,8 @@ class QueryBuilder(Generic[ModelType]):
 
         Example:
             sorts = [
-                Sort(field=UserSortField.CREATED_AT, direction=SortDirection.DESC),
-                Sort(field=UserSortField.USERNAME, direction=SortDirection.ASC)
+                Sort(field=UserSortField.CREATED_AT, order=Order.DESC),
+                Sort(field=UserSortField.USERNAME, order=Order.ASC)
             ]
             mapper = {
                 UserSortField.CREATED_AT: User.created_at,
@@ -256,11 +256,9 @@ class QueryBuilder(Generic[ModelType]):
             qb.apply_sorts(sorts, mapper)
         """
         for sort_item in sort_list:
-            column = column_mapper.get(sort_item.field)
+            column = column_mapper.get(sort_item.by)
             if column is None:
-                raise ValueError(
-                    f"Column mapping not found for field: {sort_item.field}"
-                )
+                raise ValueError(f"Column mapping not found for field: {sort_item.by}")
             self.apply_sort(sort_item, column)
         return self
 

@@ -7,7 +7,7 @@ from dplex.services.sort import Sort
 SortFieldType = TypeVar("SortFieldType")
 
 
-class BaseFilterableFields(BaseModel, Generic[SortFieldType]):
+class DPFilters(BaseModel, Generic[SortFieldType]):
     """
     Базовая схема для фильтруемых полей
 
@@ -22,7 +22,7 @@ class BaseFilterableFields(BaseModel, Generic[SortFieldType]):
     Example:
         ```python
         from enum import StrEnum
-        from dplex.services import BaseFilterableFields
+        from dplex.services import DPFilters
         from dplex.services.filters import StringFilter, IntFilter
 
         class UserSortField(StrEnum):
@@ -31,7 +31,7 @@ class BaseFilterableFields(BaseModel, Generic[SortFieldType]):
             AGE = "age"
             CREATED_AT = "created_at"
 
-        class UserFilterableFields(BaseFilterableFields[UserSortField]):
+        class UserFilterableFields(DPFilters[UserSortField]):
             name: StringFilter | None = None
             email: StringFilter | None = None
             age: IntFilter | None = None
@@ -241,7 +241,7 @@ class BaseFilterableFields(BaseModel, Generic[SortFieldType]):
             True если установлена сортировка
 
         Example:
-            >>> filters = UserFilterableFields(sort=Sort(field=UserSortField.NAME))
+            >>> filters = UserFilterableFields(sort=Sort(by=UserSortField.NAME))
             >>> filters.has_sort()
             True
         """
