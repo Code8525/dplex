@@ -214,20 +214,28 @@ NumberFilter = BaseNumberFilter
 
 class StringFilter:
     """
-    Фильтр для строковых полей с поддержкой паттернов
+    Фильтр для строковых полей с поддержкой паттернов.
 
     Предоставляет широкий набор операторов для фильтрации текстовых данных,
     включая точное совпадение, поиск по шаблону и проверку вхождения подстроки.
 
     Примеры использования:
-        # Поиск по части имени (регистронезависимый)
         name_filter = StringFilter(icontains="john")
-
-        # Поиск email с определенным доменом
         email_filter = StringFilter(ends_with="@example.com")
-
-        # Исключение конкретных статусов
         status_filter = StringFilter(not_in=["deleted", "banned"])
+
+    :param eq: Точное совпадение (equal). Пример: `name = 'John'`
+    :param ne: Не равно (not equal). Пример: `status != 'deleted'`
+    :param like: SQL LIKE с учетом регистра. Пример: `name LIKE 'John%'`
+    :param ilike: SQL ILIKE без учета регистра. Пример: `email ILIKE '%@gmail.com'`
+    :param contains: Содержит подстроку (регистрозависимо). Пример: `description LIKE '%python%'`
+    :param icontains: Содержит подстроку без учета регистра. Пример: `title ILIKE '%api%'`
+    :param starts_with: Начинается с. Пример: `url LIKE 'https://%'`
+    :param ends_with: Заканчивается на. Пример: `filename LIKE '%.pdf'`
+    :param in_: Проверка в списке. Пример: `status IN ('active', 'pending')`
+    :param not_in: Исключение из списка. Пример: `role NOT IN ('admin', 'moderator')`
+    :param is_null: Проверяет, что значение равно NULL.
+    :param is_not_null: Проверяет, что значение не NULL.
     """
 
     def __init__(

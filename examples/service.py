@@ -290,7 +290,7 @@ async def example_get_all_with_filters(service: UserService) -> None:
         print(f"  - {user.name}, возраст: {user.age}")
 
     # Фильтр: имя содержит "John"
-    filters = UserFilterableFields(name=StringFilter(icontains="john"))
+    filters = UserFilterableFields(name=StringFilter(ends_with="@mail.ru"))
     users = await service.get_all(filters)
     print(f"\n✓ Пользователей с 'john' в имени: {len(users)}")
     for user in users:
