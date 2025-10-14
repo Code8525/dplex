@@ -27,11 +27,19 @@ class DPRepo(Generic[ModelType, KeyType]):
 
     def _get_id_column(self) -> InstrumentedAttribute[KeyType]:
         """Получить типизированную ID колонку"""
-        column = getattr(self.model, self.id_field_name)
-        if not isinstance(column, InstrumentedAttribute):
+        if not hasattr(self.model, self.id_field_name):
             raise ValueError(
-                f"Field '{self.id_field_name}' is not a valid SQLAlchemy column"
+                f"Model {self.model.__name__} does not have field '{self.id_field_name}'"
             )
+
+        column = getattr(self.model, self.id_field_name)
+
+        # Проверяем что это SQLAlchemy column
+        if not hasattr(column, "property"):
+            raise ValueError(
+                f"Field '{self.id_field_name}' in {self.model.__name__} is not a SQLAlchemy column"
+            )
+
         return column
 
     def query(self) -> "QueryBuilder[ModelType]":

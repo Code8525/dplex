@@ -1,12 +1,13 @@
-"""Базовый сервис для бизнес-логики"""
+"""Базовый сервис для бизнес-логики с ПОЛНОЙ автоматизацией"""
 
 from typing import Any, Generic
-from abc import ABC, abstractmethod
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
 from dplex.repositories.repository import DPRepo
 from dplex.services.filter_applier import FilterApplier
-from dplex.services.sort import Sort, SortDirection, NullsPlacement
+from dplex.services.base_filterable_fields import BaseFilterableFields
+from dplex.services.sort import Sort, SortDirection
 from dplex.types import (
     ModelType,
     KeyType,
@@ -15,6 +16,7 @@ from dplex.types import (
     ResponseSchemaType,
     FilterSchemaType,
     SortFieldSchemaType,
+    NullMarker,
 )
 
 
@@ -27,17 +29,20 @@ class DPService(
         ResponseSchemaType,
         FilterSchemaType,
         SortFieldSchemaType,
-    ],
-    ABC,
+    ]
 ):
     """
-    Базовый сервис с типизированными схемами и фильтрами
+    Базовый сервис с ПОЛНОЙ автоматизацией
 
-    Предоставляет полный CRUD функционал с поддержкой:
-    - Типизированных схем (создание, обновление, ответ)
-    - Фильтрации и сортировки
-    - Пагинации
-    - Массовых операций
+    ВСЁ работает автоматически:
+    ✓ Создание моделей из схем (автоматически по полям)
+    ✓ Применение фильтров (автоматически через BaseFilterableFields)
+    ✓ Сортировка (автоматически по именам enum)
+    ✓ Пагинация (автоматически через limit/offset в BaseFilterableFields)
+    ✓ CRUD операции
+    ✓ Установка NULL через маркер NULL
+
+    НЕ НУЖНО переопределять методы!
 
     Type Parameters:
         ModelType: SQLAlchemy модель
@@ -45,7 +50,7 @@ class DPService(
         CreateSchemaType: Pydantic схема для создания
         UpdateSchemaType: Pydantic схема для обновления
         ResponseSchemaType: Pydantic схема для ответа
-        FilterSchemaType: Схема фильтрации
+        FilterSchemaType: Схема фильтрации (наследник BaseFilterableFields)
         SortFieldSchemaType: Enum полей для сортировки
     """
 
@@ -68,91 +73,54 @@ class DPService(
         self.response_schema = response_schema
         self.filter_applier = FilterApplier()
 
+    # ==================== АВТОМАТИЧЕСКИЕ МЕТОДЫ ====================
+
     def _model_to_schema(self, model: ModelType) -> ResponseSchemaType:
         """
-        Преобразовать SQLAlchemy модель в Pydantic схему ответа
+        АВТОМАТИЧЕСКОЕ преобразование SQLAlchemy модели в Pydantic схему
 
-        Дефолтная реализация использует model_validate.
-        Переопределите для кастомной логики преобразования.
+        Использует model_validate из Pydantic.
         """
         return self.response_schema.model_validate(model)
 
-    @abstractmethod
     def _create_schema_to_model(self, schema: CreateSchemaType) -> ModelType:
         """
-        Преобразовать схему создания в SQLAlchemy модель
+        АВТОМАТИЧЕСКОЕ преобразование схемы создания в SQLAlchemy модель
 
-        ОБЯЗАТЕЛЬНО переопределить в наследнике.
-
-        Args:
-            schema: Pydantic схема создания
-
-        Returns:
-            Новая SQLAlchemy модель (не сохраненная в БД)
-
-        Example:
-            def _create_schema_to_model(self, schema: UserCreate) -> User:
-                return User(
-                    username=schema.username,
-                    email=schema.email,
-                    password_hash=hash_password(schema.password)
-                )
+        Работает через model_dump() и **kwargs в конструктор модели.
         """
-        pass
+        if isinstance(schema, BaseModel):
+            data = schema.model_dump(exclude_unset=True)
+        else:
+            data = schema.__dict__
 
-    @abstractmethod
+        return self.repository.model(**data)
+
     def _apply_filter_to_query(
         self, query_builder: Any, filter_data: FilterSchemaType
     ) -> Any:
         """
-        Применить фильтры из схемы к query builder
+        АВТОМАТИЧЕСКОЕ применение фильтров к query builder
 
-        ОБЯЗАТЕЛЬНО переопределить в наследнике.
-
-        Args:
-            query_builder: QueryBuilder для добавления фильтров
-            filter_data: Схема с данными фильтрации
-
-        Returns:
-            QueryBuilder с примененными фильтрами
-
-        Example:
-            def _apply_filter_to_query(self, qb, filter_data: UserFilter):
-                if filter_data.username:
-                    qb = self.filter_applier.apply_string_filter(
-                        qb, User.username, filter_data.username
-                    )
-                if filter_data.is_active:
-                    qb = self.filter_applier.apply_boolean_filter(
-                        qb, User.is_active, filter_data.is_active
-                    )
-                return qb
+        Работает с BaseFilterableFields - автоматически применяет все активные фильтры.
         """
-        pass
+        # Если filter_data это наследник BaseFilterableFields
+        if isinstance(filter_data, BaseFilterableFields):
+            # Автоматически применяем все активные фильтры
+            query_builder = self.filter_applier.apply_filters_from_schema(
+                query_builder, self.repository.model, filter_data
+            )
 
-    @abstractmethod
-    def _sort_field_to_column_name(self, sort_field: SortFieldSchemaType) -> str:
+        return query_builder
+
+    @staticmethod
+    def _sort_field_to_column_name(sort_field: SortFieldSchemaType) -> str:
         """
-        Преобразовать enum поля сортировки в имя колонки модели
+        АВТОМАТИЧЕСКОЕ преобразование enum поля сортировки в имя колонки
 
-        ОБЯЗАТЕЛЬНО переопределить в наследнике.
-
-        Args:
-            sort_field: Enum значение поля для сортировки
-
-        Returns:
-            Имя колонки SQLAlchemy модели
-
-        Example:
-            def _sort_field_to_column_name(self, sort_field: UserSortField) -> str:
-                mapping = {
-                    UserSortField.USERNAME: "username",
-                    UserSortField.CREATED_AT: "created_at",
-                    UserSortField.EMAIL: "email",
-                }
-                return mapping[sort_field]
+        Использует .value из enum (для StrEnum это будет имя колонки).
         """
-        pass
+        return str(sort_field.value)
 
     def _get_model_column(self, field_name: str) -> Any:
         """
@@ -173,8 +141,9 @@ class DPService(
             )
         return getattr(self.repository.model, field_name)
 
+    @staticmethod
     def _normalize_sort_list(
-        self, sort: list[Sort[SortFieldSchemaType]] | Sort[SortFieldSchemaType] | None
+        sort: list[Sort[SortFieldSchemaType]] | Sort[SortFieldSchemaType] | None,
     ) -> list[Sort[SortFieldSchemaType]]:
         """
         Нормализовать сортировку в список
@@ -223,7 +192,7 @@ class DPService(
         self, filter_data: FilterSchemaType
     ) -> list[Sort[SortFieldSchemaType]]:
         """
-        Извлечь сортировку из схемы фильтра
+        Извлечь сортировку из схемы фильтра (BaseFilterableFields)
 
         Args:
             filter_data: Схема фильтра
@@ -231,46 +200,90 @@ class DPService(
         Returns:
             Список элементов Sort
         """
-        # Проверяем наличие поля sort в фильтре
-        if not hasattr(filter_data, "sort"):
-            return []
+        # BaseFilterableFields гарантирует наличие поля sort
+        if isinstance(filter_data, BaseFilterableFields):
+            return self._normalize_sort_list(filter_data.sort)
 
-        sort_value = getattr(filter_data, "sort", None)
-        return self._normalize_sort_list(sort_value)
+        # Fallback для старых схем без BaseFilterableFields
+        if hasattr(filter_data, "sort"):
+            return self._normalize_sort_list(filter_data.sort)
 
+        return []
+
+    @staticmethod
     def _make_update_dict(
-        self,
         update_data: UpdateSchemaType,
-        include_none: bool = False,
         fields_to_update: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Создать словарь для обновления из Pydantic схемы
 
+        ПОДДЕРЖКА МАРКЕРА NULL:
+        - Поле не указано (exclude_unset) -> НЕ обновляем
+        - Поле = NULL (маркер) -> обновляем в None (NULL в БД)
+        - Поле = обычное значение -> обновляем значением
+
         Args:
             update_data: Pydantic схема с данными обновления
-            include_none: Включать ли поля со значением None
-            fields_to_update: Явный список полей для обновления (если указан, include_none игнорируется)
+            fields_to_update: Явный список полей для обновления (если None - все установленные)
 
         Returns:
             Словарь {field_name: value} для передачи в repository.update
-        """
-        if fields_to_update is not None:
-            # Режим явного указания полей (включая None значения)
-            full_dump = update_data.model_dump()
-            return {
-                field: full_dump[field]
-                for field in fields_to_update
-                if field in full_dump
-            }
 
-        # Автоматический режим
-        if include_none:
-            # Все установленные поля, включая None
-            return update_data.model_dump(exclude_unset=True)
+        Examples:
+            >>> from dplex import NULL
+
+            >>> # Обновить только name
+            >>> data = UserUpdate(name="John")
+            >>> _make_update_dict(data)
+            {'name': 'John'}
+
+            >>> # Установить email в NULL
+            >>> data = UserUpdate(email=NULL)
+            >>> _make_update_dict(data)
+            {'email': None}
+
+            >>> # Смешанное обновление
+            >>> data = UserUpdate(name="John", email=NULL, age=30)
+            >>> _make_update_dict(data)
+            {'name': 'John', 'email': None, 'age': 30}
+
+            >>> # С явным списком полей
+            >>> data = UserUpdate(name="John", email=NULL, age=30)
+            >>> _make_update_dict(data, fields_to_update=["email"])
+            {'email': None}
+        """
+        if isinstance(update_data, BaseModel):
+            if fields_to_update is not None:
+                # Режим явного указания полей
+                full_dump = update_data.model_dump()
+                result = {}
+                for field in fields_to_update:
+                    if field in full_dump:
+                        value = full_dump[field]
+                        # Преобразуем Marker.NULL в None для БД
+                        if isinstance(value, NullMarker):
+                            result[field] = None
+                        else:
+                            result[field] = value
+                return result
+
+            # Автоматический режим - только установленные поля
+            dump = update_data.model_dump(exclude_unset=True)
+            result = {}
+
+            for field_name, field_value in dump.items():
+                # Обрабатываем маркер NULL
+                if isinstance(field_value, NullMarker):
+                    result[field_name] = None  # NULL маркер -> None в БД
+                else:
+                    # Обычное значение (включая None)
+                    result[field_name] = field_value
+
+            return result
         else:
-            # Только установленные не-None поля
-            return update_data.model_dump(exclude_unset=True, exclude_none=True)
+            # Fallback для не-Pydantic объектов
+            return update_data.__dict__
 
     def _apply_base_filters(
         self, query_builder: Any, filter_data: FilterSchemaType
@@ -278,27 +291,35 @@ class DPService(
         """
         Применить базовые фильтры: фильтрация, сортировка, limit, offset
 
+        АВТОМАТИЧЕСКИ извлекает всё из BaseFilterableFields.
+
         Args:
             query_builder: QueryBuilder
-            filter_data: Схема фильтра
+            filter_data: Схема фильтра (BaseFilterableFields)
 
         Returns:
             QueryBuilder с примененными фильтрами
         """
-        # 1. Применяем кастомные фильтры
+        # 1. Применяем кастомные фильтры (автоматически)
         query_builder = self._apply_filter_to_query(query_builder, filter_data)
 
-        # 2. Применяем сортировку из Sort объектов
+        # 2. Применяем сортировку из Sort объектов (автоматически из BaseFilterableFields)
         sort_list = self._get_sort_from_filter(filter_data)
         if sort_list:
             query_builder = self._apply_sort_to_query(query_builder, sort_list)
 
-        # 3. Применяем limit
-        if hasattr(filter_data, "limit") and filter_data.limit is not None:
+        # 3. Применяем limit (автоматически из BaseFilterableFields)
+        if (
+            isinstance(filter_data, BaseFilterableFields)
+            and filter_data.limit is not None
+        ):
             query_builder = query_builder.limit(filter_data.limit)
 
-        # 4. Применяем offset
-        if hasattr(filter_data, "offset") and filter_data.offset is not None:
+        # 4. Применяем offset (автоматически из BaseFilterableFields)
+        if (
+            isinstance(filter_data, BaseFilterableFields)
+            and filter_data.offset is not None
+        ):
             query_builder = query_builder.offset(filter_data.offset)
 
         return query_builder
@@ -349,8 +370,10 @@ class DPService(
         """
         Получить все сущности с фильтрацией и сортировкой
 
+        АВТОМАТИЧЕСКИ применяет все фильтры, сортировку, limit и offset из BaseFilterableFields.
+
         Args:
-            filter_data: Схема фильтра с параметрами поиска
+            filter_data: Схема фильтра с параметрами поиска (BaseFilterableFields)
 
         Returns:
             Список схем ответа
@@ -430,6 +453,7 @@ class DPService(
         """
         model = self._create_schema_to_model(create_data)
         created_model = await self.repository.create(model)
+        await self.session.flush()
         return self._model_to_schema(created_model)
 
     async def create_bulk(
@@ -446,24 +470,52 @@ class DPService(
         """
         models = [self._create_schema_to_model(data) for data in create_data_list]
         created_models = await self.repository.create_bulk(models)
+        await self.session.flush()
         return self._models_to_schemas(created_models)
 
     async def update_by_id(
         self,
         entity_id: KeyType,
         update_data: UpdateSchemaType,
-        include_none: bool = False,
     ) -> ResponseSchemaType | None:
         """
         Обновить сущность по ID
 
+        ПОДДЕРЖКА NULL:
+        Используйте маркер NULL для явной установки NULL в БД.
+
+        Логика обновления:
+        - Поле не указано -> не обновляется (остаётся прежнее значение)
+        - Поле = значение -> обновляется значением
+        - Поле = NULL -> устанавливается в NULL (удаляется значение)
+
         Args:
             entity_id: Первичный ключ
             update_data: Схема обновления с новыми данными
-            include_none: Если True, поля со значением None также будут обновлены
 
         Returns:
             Обновленная схема ответа или None если сущность не найдена
+
+        Examples:
+            >>> from dplex import NULL
+
+            >>> # Обновить только name
+            >>> user = await service.update_by_id(
+            ...     user_id,
+            ...     UserUpdate(name="John Doe")
+            ... )
+
+            >>> # Обновить name и установить email в NULL
+            >>> user = await service.update_by_id(
+            ...     user_id,
+            ...     UserUpdate(name="John", email=NULL)
+            ... )
+
+            >>> # Установить несколько полей в NULL
+            >>> user = await service.update_by_id(
+            ...     user_id,
+            ...     UserUpdate(email=NULL, phone=NULL, bio=NULL)
+            ... )
         """
         # Проверяем существование
         existing_model = await self.repository.find_by_id(entity_id)
@@ -471,7 +523,7 @@ class DPService(
             return None
 
         # Обновляем
-        update_dict = self._make_update_dict(update_data, include_none=include_none)
+        update_dict = self._make_update_dict(update_data)
         await self.repository.update_by_id(entity_id, update_dict)
 
         # Получаем обновленную версию
@@ -485,20 +537,36 @@ class DPService(
         self,
         entity_ids: list[KeyType],
         update_data: UpdateSchemaType,
-        include_none: bool = False,
     ) -> list[ResponseSchemaType]:
         """
         Обновить несколько сущностей по списку ID
 
+        ПОДДЕРЖКА NULL:
+        Маркер NULL работает для массового обновления.
+
         Args:
             entity_ids: Список первичных ключей
             update_data: Схема обновления (одинаковая для всех)
-            include_none: Если True, поля со значением None также будут обновлены
 
         Returns:
             Список обновленных схем ответа
+
+        Examples:
+            >>> from dplex import NULL
+
+            >>> # Деактивировать нескольких пользователей
+            >>> users = await service.update_by_ids(
+            ...     [1, 2, 3],
+            ...     UserUpdate(is_active=False)
+            ... )
+
+            >>> # Очистить email у нескольких пользователей
+            >>> users = await service.update_by_ids(
+            ...     [4, 5, 6],
+            ...     UserUpdate(email=NULL)
+            ... )
         """
-        update_dict = self._make_update_dict(update_data, include_none=include_none)
+        update_dict = self._make_update_dict(update_data)
         await self.repository.update_by_ids(entity_ids, update_dict)
 
         updated_models = await self.repository.find_by_ids(entity_ids)
@@ -515,6 +583,9 @@ class DPService(
 
         Полезно когда нужно обновить конкретные поля, включая установку NULL.
 
+        ПОДДЕРЖКА NULL:
+        Маркер NULL работает с явным списком полей.
+
         Args:
             entity_id: Первичный ключ
             update_data: Схема обновления
@@ -523,12 +594,24 @@ class DPService(
         Returns:
             Обновленная схема ответа или None если сущность не найдена
 
-        Example:
-            await service.update_by_id_with_fields(
-                user_id,
-                UserUpdate(email=None, name="John"),
-                fields_to_update=["email", "name"]  # email будет установлен в NULL
-            )
+        Examples:
+            >>> from dplex import NULL
+
+            >>> # Обновить только email (установить в NULL)
+            >>> user = await service.update_by_id_with_fields(
+            ...     user_id,
+            ...     UserUpdate(name="Ignored", email=NULL),
+            ...     fields_to_update=["email"]
+            ... )
+            # name не будет обновлён, email будет NULL
+
+            >>> # Обновить несколько полей выборочно
+            >>> user = await service.update_by_id_with_fields(
+            ...     user_id,
+            ...     UserUpdate(name="John", email=NULL, age=30, bio="Dev"),
+            ...     fields_to_update=["name", "email"]
+            ... )
+            # Обновятся только name и email, age и bio игнорируются
         """
         existing_model = await self.repository.find_by_id(entity_id)
         if existing_model is None:
@@ -612,10 +695,12 @@ class DPService(
         """
         Пагинация с фильтрацией и сортировкой
 
+        АВТОМАТИЧЕСКИ использует BaseFilterableFields для фильтрации и сортировки.
+
         Args:
             page: Номер страницы (начиная с 1)
             per_page: Количество элементов на странице
-            filter_data: Схема фильтра
+            filter_data: Схема фильтра (BaseFilterableFields)
 
         Returns:
             Кортеж (список_данных, общее_количество)
@@ -628,16 +713,19 @@ class DPService(
         if per_page < 1:
             raise ValueError("Количество на странице должно быть >= 1")
 
-        # Подсчитываем общее количество
+        # Подсчитываем общее количество (без пагинации)
         total_count = await self.count(filter_data)
 
         # Создаем копию фильтра с пагинацией
-        paginated_filter = filter_data.model_copy()
+        if isinstance(filter_data, BaseModel):
+            paginated_filter = filter_data.model_copy()
+        else:
+            # Fallback для не-Pydantic объектов
+            paginated_filter = filter_data
 
-        # Устанавливаем limit и offset
-        if hasattr(paginated_filter, "limit"):
+        # Устанавливаем limit и offset в BaseFilterableFields
+        if isinstance(paginated_filter, BaseFilterableFields):
             paginated_filter.limit = per_page
-        if hasattr(paginated_filter, "offset"):
             paginated_filter.offset = (page - 1) * per_page
 
         # Получаем данные для страницы

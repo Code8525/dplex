@@ -1,6 +1,6 @@
 import uuid
 from enum import Enum, StrEnum
-from typing import TypeVar, Union, Any
+from typing import TypeVar, Union, Any, TypeAlias
 
 from pydantic import BaseModel
 from sqlalchemy.orm import DeclarativeBase
@@ -48,3 +48,31 @@ FilterType = (
     | EnumFilter
     | UUIDFilter
 )
+
+
+class NullMarker(Enum):
+    """
+    Специальные маркеры для операций с базой данных
+
+    Attributes:
+        NULL: Маркер для явной установки NULL в БД при обновлении.
+              Отличается от None (не обновлять) и от обычного значения.
+
+    Examples:
+        >>> update = UserUpdate(email=NULL)
+        >>> # email будет установлен в NULL в базе данных
+    """
+
+    NULL = "null"
+
+    def __repr__(self) -> str:
+        """Строковое представление маркера"""
+        return self.name  # Вернёт "NULL"
+
+    def __bool__(self) -> bool:
+        """Логическое значение - всегда False для условий"""
+        return False
+
+
+# Синглтон
+NULL = NullMarker.NULL

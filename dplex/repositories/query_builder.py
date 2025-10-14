@@ -1,16 +1,19 @@
-from typing import Any, Generic
+from typing import Any, Generic, TYPE_CHECKING
 from sqlalchemy import ColumnElement, asc, desc, nullsfirst, nullslast
 from sqlalchemy.orm import InstrumentedAttribute
 
-from src.dplex.repositories.repository import DPRepo
-from src.dplex.services.sort import Sort, SortDirection, NullsPlacement
-from src.dplex.types import ModelType, SortFieldType
+
+from dplex.services.sort import Sort, SortDirection, NullsPlacement
+from dplex.types import ModelType
+
+if TYPE_CHECKING:
+    from dplex.repositories.repository import DPRepo
 
 
 class QueryBuilder(Generic[ModelType]):
     """Query Builder с улучшенной типизацией и поддержкой Sort"""
 
-    def __init__(self, repo: DPRepo[ModelType, Any], model: type[ModelType]) -> None:
+    def __init__(self, repo: "DPRepo[ModelType, Any]", model: type[ModelType]) -> None:
         self.repo = repo
         self.model = model
         self.filters: list[ColumnElement[bool]] = []
