@@ -3,7 +3,6 @@ dplex - Enterprise-grade data layer framework for Python
 """
 
 from dplex.repositories.dp_repo import DPRepo
-from dplex.types import NullMarker, NULL
 from dplex.services.dp_service import DPService
 from dplex.services.dp_filters import DPFilters
 from dplex.services.sort import Sort, Order, NullsPlacement
@@ -44,7 +43,4 @@ __all__ = [
     "TimestampFilter",
     "EnumFilter",
     "UUIDFilter",
-    # Null marker
-    "NULL",
-    "NullMarker",
 ]

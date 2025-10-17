@@ -1,6 +1,7 @@
 """Базовый сервис для бизнес-логики с ПОЛНОЙ автоматизацией"""
 
 from typing import Any, Generic
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
@@ -16,7 +17,6 @@ from dplex.types import (
     ResponseSchemaType,
     FilterSchemaType,
     SortFieldSchemaType,
-    NullMarker,
 )
 
 
@@ -32,17 +32,7 @@ class DPService(
     ]
 ):
     """
-    Базовый сервис с ПОЛНОЙ автоматизацией
-
-    ВСЁ работает автоматически:
-    ✓ Создание моделей из схем (автоматически по полям)
-    ✓ Применение фильтров (автоматически через DPFilters)
-    ✓ Сортировка (автоматически по именам enum)
-    ✓ Пагинация (автоматически через limit/offset в DPFilters)
-    ✓ CRUD операции
-    ✓ Установка NULL через маркер NULL
-
-    НЕ НУЖНО переопределять методы!
+    Базовый сервис
 
     Type Parameters:
         ModelType: SQLAlchemy модель
@@ -90,7 +80,7 @@ class DPService(
         Работает через model_dump() и **kwargs в конструктор модели.
         """
         if isinstance(schema, BaseModel):
-            data = schema.model_dump(exclude_unset=True)
+            data = schema.model_dump(exclude_none=True)
         else:
             data = schema.__dict__
 
@@ -204,86 +194,44 @@ class DPService(
         if isinstance(filter_data, DPFilters):
             return self._normalize_sort_list(filter_data.sort)
 
-        # Fallback для старых схем без DPFilters
-        if hasattr(filter_data, "sort"):
-            return self._normalize_sort_list(filter_data.sort)
-
         return []
 
     @staticmethod
-    def _make_update_dict(
-        update_data: UpdateSchemaType,
-        fields_to_update: list[str] | None = None,
-    ) -> dict[str, Any]:
+    def _make_update_dict(update_data: BaseModel) -> dict[str, Any]:
         """
-        Создать словарь для обновления из Pydantic схемы
+        Формирует словарь для частичного обновления записи в базе данных из Pydantic-модели.
 
-        ПОДДЕРЖКА МАРКЕРА NULL:
-        - Поле не указано (exclude_unset) -> НЕ обновляем
-        - Поле = NULL (маркер) -> обновляем в None (NULL в БД)
-        - Поле = обычное значение -> обновляем значением
+        Метод анализирует модель и возвращает только те поля, которые были
+        реально переданы пользователем при создании экземпляра (на основе `model_fields_set`).
+        Таким образом:
+        - Поля, не переданные пользователем, не попадают в результат.
+        - Поля, переданные со значением `None`, будут установлены в `NULL` в БД.
+        - Поля, переданные с любым другим значением, обновляются этим значением.
 
         Args:
-            update_data: Pydantic схема с данными обновления
-            fields_to_update: Явный список полей для обновления (если None - все установленные)
+            update_data (BaseModel): экземпляр Pydantic-модели, например `UserUpdate`.
 
         Returns:
-            Словарь {field_name: value} для передачи в repository.update
+            dict[str, object]: словарь с парами {имя_поля: значение} для передачи
+            в метод репозитория (например `repository.update(...)`).
 
-        Examples:
-            >>> from dplex import NULL
-
-            >>> # Обновить только name
-            >>> data = UserUpdate(name="John")
-            >>> _make_update_dict(data)
+        Примеры:
+            >>> from examples.service import UserService
+            >>> class UserUpdate(BaseModel):
+            ...     name: str | None = None
+            ...     email: str | None = None
+            ...
+            >>> # Пользователь ничего не передал
+            >>> UserService._make_update_dict(UserUpdate())
+            {}
+            >>> # Пользователь обнуляет поле
+            >>> UserService._make_update_dict(UserUpdate(email=None))
+            {'email': None}
+            >>> # Пользователь обновляет имя
+            >>> UserService._make_update_dict(UserUpdate(name="John"))
             {'name': 'John'}
-
-            >>> # Установить email в NULL
-            >>> data = UserUpdate(email=NULL)
-            >>> _make_update_dict(data)
-            {'email': None}
-
-            >>> # Смешанное обновление
-            >>> data = UserUpdate(name="John", email=NULL, age=30)
-            >>> _make_update_dict(data)
-            {'name': 'John', 'email': None, 'age': 30}
-
-            >>> # С явным списком полей
-            >>> data = UserUpdate(name="John", email=NULL, age=30)
-            >>> _make_update_dict(data, fields_to_update=["email"])
-            {'email': None}
         """
-        if isinstance(update_data, BaseModel):
-            if fields_to_update is not None:
-                # Режим явного указания полей
-                full_dump = update_data.model_dump()
-                result = {}
-                for field in fields_to_update:
-                    if field in full_dump:
-                        value = full_dump[field]
-                        # Преобразуем Marker.NULL в None для БД
-                        if isinstance(value, NullMarker):
-                            result[field] = None
-                        else:
-                            result[field] = value
-                return result
-
-            # Автоматический режим - только установленные поля
-            dump = update_data.model_dump(exclude_unset=True)
-            result = {}
-
-            for field_name, field_value in dump.items():
-                # Обрабатываем маркер NULL
-                if isinstance(field_value, NullMarker):
-                    result[field_name] = None  # NULL маркер -> None в БД
-                else:
-                    # Обычное значение (включая None)
-                    result[field_name] = field_value
-
-            return result
-        else:
-            # Fallback для не-Pydantic объектов
-            return update_data.__dict__
+        return update_data.model_dump(exclude_unset=True)
 
     def _apply_base_filters(
         self, query_builder: Any, filter_data: FilterSchemaType
@@ -471,181 +419,31 @@ class DPService(
         self,
         entity_id: KeyType,
         update_data: UpdateSchemaType,
-    ) -> ResponseSchemaType | None:
+    ) -> None:
         """
         Обновить сущность по ID
-
-        ПОДДЕРЖКА NULL:
-        Используйте маркер NULL для явной установки NULL в БД.
-
-        Логика обновления:
-        - Поле не указано -> не обновляется (остаётся прежнее значение)
-        - Поле = значение -> обновляется значением
-        - Поле = NULL -> устанавливается в NULL (удаляется значение)
 
         Args:
             entity_id: Первичный ключ
             update_data: Схема обновления с новыми данными
-
-        Returns:
-            Обновленная схема ответа или None если сущность не найдена
-
-        Examples:
-            >>> from dplex import NULL
-
-            >>> # Обновить только name
-            >>> user = await service.update_by_id(
-            ...     user_id,
-            ...     UserUpdate(name="John Doe")
-            ... )
-
-            >>> # Обновить name и установить email в NULL
-            >>> user = await service.update_by_id(
-            ...     user_id,
-            ...     UserUpdate(name="John", email=NULL)
-            ... )
-
-            >>> # Установить несколько полей в NULL
-            >>> user = await service.update_by_id(
-            ...     user_id,
-            ...     UserUpdate(email=NULL, phone=NULL, bio=NULL)
-            ... )
         """
-        # Проверяем существование
-        existing_model = await self.repository.find_by_id(entity_id)
-        if existing_model is None:
-            return None
-
-        # Обновляем
         update_dict = self._make_update_dict(update_data)
         await self.repository.update_by_id(entity_id, update_dict)
-
-        # Получаем обновленную версию
-        updated_model = await self.repository.find_by_id(entity_id)
-        if updated_model is None:
-            return None
-
-        return self._model_to_schema(updated_model)
 
     async def update_by_ids(
         self,
         entity_ids: list[KeyType],
         update_data: UpdateSchemaType,
-    ) -> list[ResponseSchemaType]:
+    ) -> None:
         """
         Обновить несколько сущностей по списку ID
-
-        ПОДДЕРЖКА NULL:
-        Маркер NULL работает для массового обновления.
 
         Args:
             entity_ids: Список первичных ключей
             update_data: Схема обновления (одинаковая для всех)
-
-        Returns:
-            Список обновленных схем ответа
-
-        Examples:
-            >>> from dplex import NULL
-
-            >>> # Деактивировать нескольких пользователей
-            >>> users = await service.update_by_ids(
-            ...     [1, 2, 3],
-            ...     UserUpdate(is_active=False)
-            ... )
-
-            >>> # Очистить email у нескольких пользователей
-            >>> users = await service.update_by_ids(
-            ...     [4, 5, 6],
-            ...     UserUpdate(email=NULL)
-            ... )
         """
         update_dict = self._make_update_dict(update_data)
         await self.repository.update_by_ids(entity_ids, update_dict)
-
-        updated_models = await self.repository.find_by_ids(entity_ids)
-        return self._models_to_schemas(updated_models)
-
-    async def update_by_id_with_fields(
-        self,
-        entity_id: KeyType,
-        update_data: UpdateSchemaType,
-        fields_to_update: list[str],
-    ) -> ResponseSchemaType | None:
-        """
-        Обновить сущность по ID с явным указанием полей
-
-        Полезно когда нужно обновить конкретные поля, включая установку NULL.
-
-        ПОДДЕРЖКА NULL:
-        Маркер NULL работает с явным списком полей.
-
-        Args:
-            entity_id: Первичный ключ
-            update_data: Схема обновления
-            fields_to_update: Явный список имен полей для обновления
-
-        Returns:
-            Обновленная схема ответа или None если сущность не найдена
-
-        Examples:
-            >>> from dplex import NULL
-
-            >>> # Обновить только email (установить в NULL)
-            >>> user = await service.update_by_id_with_fields(
-            ...     user_id,
-            ...     UserUpdate(name="Ignored", email=NULL),
-            ...     fields_to_update=["email"]
-            ... )
-            # name не будет обновлён, email будет NULL
-
-            >>> # Обновить несколько полей выборочно
-            >>> user = await service.update_by_id_with_fields(
-            ...     user_id,
-            ...     UserUpdate(name="John", email=NULL, age=30, bio="Dev"),
-            ...     fields_to_update=["name", "email"]
-            ... )
-            # Обновятся только name и email, age и bio игнорируются
-        """
-        existing_model = await self.repository.find_by_id(entity_id)
-        if existing_model is None:
-            return None
-
-        update_dict = self._make_update_dict(
-            update_data, fields_to_update=fields_to_update
-        )
-        await self.repository.update_by_id(entity_id, update_dict)
-
-        updated_model = await self.repository.find_by_id(entity_id)
-        if updated_model is None:
-            return None
-
-        return self._model_to_schema(updated_model)
-
-    async def update_by_ids_with_fields(
-        self,
-        entity_ids: list[KeyType],
-        update_data: UpdateSchemaType,
-        fields_to_update: list[str],
-    ) -> list[ResponseSchemaType]:
-        """
-        Обновить несколько сущностей с явным указанием полей
-
-        Args:
-            entity_ids: Список первичных ключей
-            update_data: Схема обновления
-            fields_to_update: Явный список имен полей для обновления
-
-        Returns:
-            Список обновленных схем ответа
-        """
-        update_dict = self._make_update_dict(
-            update_data, fields_to_update=fields_to_update
-        )
-        await self.repository.update_by_ids(entity_ids, update_dict)
-
-        updated_models = await self.repository.find_by_ids(entity_ids)
-        return self._models_to_schemas(updated_models)
 
     async def delete_by_id(self, entity_id: KeyType) -> bool:
         """

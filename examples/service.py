@@ -11,11 +11,9 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import String, Integer
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 
-from dplex import NULL  # Импорт маркера NULL
-from dplex.types import NullMarker  # Для type hints
 from dplex.repositories.dp_repo import DPRepo
 from dplex.services.dp_filters import DPFilters
 from dplex.services.dp_service import DPService
@@ -72,19 +70,14 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     """
     Схема для обновления пользователя
-
-    Поддерживает маркер NULL для явной установки полей в NULL:
-    - Поле не указано -> не обновляется
-    - Поле = значение -> обновляется значением
-    - Поле = NULL -> устанавливается в NULL (удаляется)
     """
 
-    name: str | NullMarker | None = None
-    email: str | NullMarker | None = None
-    age: int | NullMarker | None = None
-    bio: str | NullMarker | None = None
-    phone: str | NullMarker | None = None
-    is_active: bool | NullMarker | None = None
+    name: str | None = None
+    email: str | None = None
+    age: int | None = None
+    bio: str | None = None
+    phone: str | None = None
+    is_active: bool | None = None
 
 
 class UserResponse(BaseModel):
@@ -458,7 +451,7 @@ async def example_update_with_null_marker(service: UserService) -> None:
     user_id = 2
 
     # Обновить name и установить bio в NULL
-    update_data = UserUpdate(name="Alice Updated", bio=NULL)  # Явно устанавливаем NULL
+    update_data = UserUpdate(name="Alice Updated", bio=None)  # Явно устанавливаем NULL
 
     updated_user = await service.update_by_id(user_id, update_data)
     await service.session.commit()
@@ -481,7 +474,7 @@ async def example_update_multiple_nulls(service: UserService) -> None:
     user_id = 3
 
     # Очистить email, bio и phone
-    update_data = UserUpdate(email=NULL, bio=NULL, phone=NULL)
+    update_data = UserUpdate(email=None, bio=None, phone=None)
 
     updated_user = await service.update_by_id(user_id, update_data)
     await service.session.commit()
@@ -504,7 +497,7 @@ async def example_update_mixed(service: UserService) -> None:
     user_id = 4
 
     # Обновить name и age, очистить bio
-    update_data = UserUpdate(name="David Mixed Update", age=30, bio=NULL)  # Очистить
+    update_data = UserUpdate(name="David Mixed Update", age=30, bio=None)  # Очистить
 
     updated_user = await service.update_by_id(user_id, update_data)
     await service.session.commit()
@@ -547,7 +540,7 @@ async def example_update_by_ids_with_null(service: UserService) -> None:
     user_ids = [5, 6, 7]
 
     # Очистить phone у всех
-    update_data = UserUpdate(phone=NULL)
+    update_data = UserUpdate(phone=None)
 
     updated_users = await service.update_by_ids(user_ids, update_data)
     await service.session.commit()
@@ -597,8 +590,8 @@ async def example_update_with_fields_and_null(service: UserService) -> None:
     # Установим в NULL только email, остальное игнорируем
     update_data = UserUpdate(
         name="Will be ignored",
-        email=NULL,  # Будет установлен в NULL
-        age=999,  # Будет проигнорирован
+        email=None,
+        age=999,
     )
 
     updated_user = await service.update_by_id_with_fields(
