@@ -23,8 +23,6 @@ from dplex import (
     StringFilter,
     UUIDFilter,
     DateTimeFilter,
-    NULL,
-    NullMarker,
 )
 
 
@@ -52,8 +50,8 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     # Используем маркер NULL, чтобы явно обнулить поле (NULL в БД)
-    name: str | NullMarker | None = None
-    email: str | NullMarker | None = None
+    name: str | None = None
+    email: str | None = None
 
 
 class UserResponse(BaseModel):
@@ -156,7 +154,7 @@ async def example_flow(session: AsyncSession) -> None:
 
     # ---- Update (обнуление email через специальный маркер NULL)
     u2 = await service.update_by_id(
-        u.user_id, UserUpdate(email=NULL)  # ← это поставит email IS NULL в БД
+        u.user_id, UserUpdate(email=None)  # ← это поставит email IS NULL в БД
     )
     print("Updated:", u2)
 

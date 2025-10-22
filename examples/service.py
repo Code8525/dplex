@@ -283,7 +283,7 @@ async def example_get_all_with_filters(service: UserService) -> None:
         print(f"  - {user.name}, возраст: {user.age}")
 
     # Фильтр: имя содержит "John"
-    filters = UserFilterableFields(name=StringFilter(is_not_null=True))
+    filters = UserFilterableFields(name=StringFilter(contains="john"))
     users = await service.get_all(filters)
     print(f"\n✓ Пользователей с 'john' в имени: {len(users)}")
     for user in users:
@@ -433,6 +433,8 @@ async def example_update_by_id(service: UserService) -> None:
     updated_user = await service.update_by_id(user_id, update_data)
     await service.session.commit()
 
+    updated_user = await service.get_by_id(user_id)
+
     if updated_user:
         print(f"✓ Обновлен пользователь ID={user_id}:")
         print(f"  Name: {updated_user.name}")
@@ -455,6 +457,8 @@ async def example_update_with_null_marker(service: UserService) -> None:
 
     updated_user = await service.update_by_id(user_id, update_data)
     await service.session.commit()
+
+    updated_user = await service.get_by_id(user_id)
 
     if updated_user:
         print(f"✓ Обновлен пользователь ID={user_id}:")
@@ -479,6 +483,8 @@ async def example_update_multiple_nulls(service: UserService) -> None:
     updated_user = await service.update_by_id(user_id, update_data)
     await service.session.commit()
 
+    updated_user = await service.get_by_id(user_id)
+
     if updated_user:
         print(f"✓ Очищены поля для пользователя ID={user_id}:")
         print(f"  Email: {updated_user.email}")
@@ -499,7 +505,10 @@ async def example_update_mixed(service: UserService) -> None:
     # Обновить name и age, очистить bio
     update_data = UserUpdate(name="David Mixed Update", age=30, bio=None)  # Очистить
 
-    updated_user = await service.update_by_id(user_id, update_data)
+    await service.update_by_id(user_id, update_data)
+
+    updated_user = await service.get_by_id(user_id)
+
     await service.session.commit()
 
     if updated_user:
@@ -521,12 +530,8 @@ async def example_update_by_ids(service: UserService) -> None:
     user_ids = [5, 6, 7]
     update_data = UserUpdate(is_active=True)
 
-    updated_users = await service.update_by_ids(user_ids, update_data)
+    await service.update_by_ids(user_ids, update_data)
     await service.session.commit()
-
-    print(f"✓ Обновлено {len(updated_users)} пользователей:")
-    for user in updated_users:
-        print(f"  - ID: {user.id}, Active: {user.is_active}")
 
 
 async def example_update_by_ids_with_null(service: UserService) -> None:
@@ -545,10 +550,6 @@ async def example_update_by_ids_with_null(service: UserService) -> None:
     updated_users = await service.update_by_ids(user_ids, update_data)
     await service.session.commit()
 
-    print(f"✓ Очищен phone у {len(updated_users)} пользователей:")
-    for user in updated_users:
-        print(f"  - ID: {user.id}, Phone: {user.phone}")
-
 
 async def example_update_by_id_with_fields(service: UserService) -> None:
     """
@@ -565,9 +566,10 @@ async def example_update_by_id_with_fields(service: UserService) -> None:
         name="Selective Update", age=99, is_active=False, bio="This will be ignored"
     )
 
-    updated_user = await service.update_by_id_with_fields(
-        user_id, update_data, fields_to_update=["name"]  # Только name
-    )
+    await service.update_by_id(user_id, update_data)  # Только name
+
+    updated_user = await service.get_by_id(user_id)
+
     await service.session.commit()
 
     if updated_user:
@@ -762,7 +764,6 @@ async def run_all_examples() -> None:
         await example_update_by_ids(service)
         await example_update_by_ids_with_null(service)
         await example_update_by_id_with_fields(service)
-        await example_update_with_fields_and_null(service)
 
         # ==================== DELETE ====================
         print("\n" + "=" * 70)

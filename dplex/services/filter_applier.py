@@ -2,6 +2,7 @@
 import datetime
 from decimal import Decimal
 from enum import Enum
+from tracemalloc import BaseFilter
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -221,7 +222,8 @@ class FilterApplier:
         filterable_fields: DPFilters,
     ) -> SupportsFiltering:
         """
-        Применить все фильтры из схемы FilterableFields автоматически
+        Применить все фильтры из схемы FilterableFields автоматически.
+        Принимает только экземпляры фильтров (StringFilter, IntFilter и т.д.)
 
         Args:
             query_builder: Query builder для применения фильтров
@@ -231,11 +233,12 @@ class FilterApplier:
         Returns:
             Query builder с примененными фильтрами
         """
+        # Получаем активные фильтры как словарь {field_name: filter_instance}
         fields_dict = filterable_fields.get_active_filters()
 
         for field_name, field_value in fields_dict.items():
-            # Пропускаем невалидные значения
-            if field_value is None or not isinstance(field_value, dict):
+            # Пропускаем None
+            if field_value is None:
                 continue
 
             # Пропускаем поля, отсутствующие в модели
@@ -244,11 +247,37 @@ class FilterApplier:
 
             column = getattr(model, field_name)
 
-            # Определяем и применяем фильтр
-            filter_type = self._detect_filter_type(field_value)
-            if filter_type is not None:
-                query_builder = self._apply_filter_by_type(
-                    query_builder, column, filter_type, field_value
+            # Применяем фильтры по типам (только экземпляры классов)
+            if isinstance(field_value, StringFilter):
+                query_builder = self.apply_string_filter(
+                    query_builder, column, field_value
+                )
+
+            elif isinstance(field_value, BooleanFilter):
+                query_builder = self.apply_boolean_filter(
+                    query_builder, column, field_value
+                )
+
+            elif isinstance(field_value, UUIDFilter):
+                query_builder = self.apply_uuid_filter(
+                    query_builder, column, field_value
+                )
+
+            elif isinstance(field_value, (IntFilter, FloatFilter, DecimalFilter)):
+                query_builder = self.apply_base_number_filter(
+                    query_builder, column, field_value
+                )
+
+            elif isinstance(
+                field_value, (DateTimeFilter, DateFilter, TimeFilter, TimestampFilter)
+            ):
+                query_builder = self.apply_base_datetime_filter(
+                    query_builder, column, field_value
+                )
+
+            elif isinstance(field_value, EnumFilter):
+                query_builder = self.apply_enum_filter(
+                    query_builder, column, field_value
                 )
 
         return query_builder

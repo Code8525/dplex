@@ -1,6 +1,7 @@
 from typing import Any, TypeVar, Generic
 from pydantic import BaseModel, ConfigDict, Field
 
+from dplex.services.filters import StringFilter
 from dplex.services.sort import Sort
 
 # Generic тип для поля сортировки
@@ -64,41 +65,25 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
 
     def get_active_filters(self) -> dict[str, Any]:
         """
-        Получить словарь только с активными (не None) фильтрами
-
+        Получить словарь только с активными (не None) фильтрами.
         Исключает специальные поля: sort, limit, offset
 
         Returns:
-            Словарь с активными фильтрами в виде dict[str, dict[str, Any]]
-
-        Example:
-            >>> filters = UserFilterableFields(name=StringFilter(eq="John"))
-            >>> filters.get_active_filters()
-            {'name': {'eq': 'John', 'ne': None, ...}}
+            Словарь {field_name: filter_instance}
         """
-        # Поля, которые не являются фильтрами
         special_fields = {"sort", "limit", "offset"}
-
         result: dict[str, Any] = {}
-        for field_name, field_value in self.model_dump(exclude_none=True).items():
-            # Пропускаем специальные поля
+
+        for field_name in self.model_fields.keys():
             if field_name in special_fields:
                 continue
 
-            # Пропускаем None значения
+            field_value = getattr(self, field_name, None)
+
             if field_value is None:
                 continue
 
-            # Если это словарь (сериализованный фильтр)
-            if isinstance(field_value, dict):
-                # Удаляем все None значения из словаря фильтра
-                cleaned_filter = {k: v for k, v in field_value.items() if v is not None}
-                # Добавляем только если остались какие-то значения
-                if cleaned_filter:
-                    result[field_name] = cleaned_filter
-            else:
-                # Для других типов добавляем как есть
-                result[field_name] = field_value
+            result[field_name] = field_value
 
         return result
 
