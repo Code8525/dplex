@@ -415,6 +415,32 @@ class DPService(
         await self.session.flush()
         return self._models_to_schemas(created_models)
 
+    async def update(
+        self,
+        filter_data: FilterSchemaType,
+        update_data: UpdateSchemaType,
+    ) -> None:
+        """
+        Массовое обновление по параметрам query_builder (только WHERE из фильтров).
+
+        Логика:
+          - build query_builder
+          - применить ТОЛЬКО фильтры (_apply_filter_to_query)
+          - выполнить repo.update_by_query_builder(...)
+        """
+        # 1) Собираем только реально переданные пользователем поля
+        update_dict = self._make_update_dict(update_data)
+        if not update_dict:
+            return  # нечего обновлять
+
+        # 2) Строим билдер и применяем ТОЛЬКО фильтры (без sort/limit/offset)
+        qb = self.repository.query()
+        qb = self._apply_filter_to_query(qb, filter_data)
+
+        # 3) Делаем единый UPDATE ... WHERE <filters>
+        await self.repository.update_by_query_builder(qb, update_dict)
+        await self.session.flush()
+
     async def update_by_id(
         self,
         entity_id: KeyType,
@@ -444,6 +470,29 @@ class DPService(
         """
         update_dict = self._make_update_dict(update_data)
         await self.repository.update_by_ids(entity_ids, update_dict)
+
+    async def delete(self, filter_data: FilterSchemaType) -> None:
+        """
+        Массовое удаление записей по фильтрам.
+
+        Логика:
+          - Создает QueryBuilder.
+          - Применяет к нему фильтры с помощью `_apply_filter_to_query`.
+          - Вызывает метод репозитория для выполнения массового DELETE.
+
+        Args:
+            filter_data: Схема с параметрами фильтрации (DPFilters).
+
+        Returns:
+            Количество удаленных записей.
+        """
+        # 1. Создаем билдер и применяем к нему ТОЛЬКО фильтры.
+        qb = self.repository.query()
+        qb = self._apply_filter_to_query(qb, filter_data)
+
+        # 2. Выполняем массовое удаление через репозиторий.
+        await self.repository.delete_by_query_builder(qb)
+        await self.session.flush()
 
     async def delete_by_id(self, entity_id: KeyType) -> bool:
         """

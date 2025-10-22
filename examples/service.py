@@ -577,35 +577,6 @@ async def example_update_by_id_with_fields(service: UserService) -> None:
         print(f"  Is Active: {updated_user.is_active} (не изменился)")
 
 
-async def example_update_with_fields_and_null(service: UserService) -> None:
-    """
-    Пример: Обновить конкретные поля включая NULL
-
-    Использует: update_by_id_with_fields() с NULL
-    """
-    print("\n=== UPDATE: Конкретные поля с NULL ===")
-
-    user_id = 2
-
-    # Установим в NULL только email, остальное игнорируем
-    update_data = UserUpdate(
-        name="Will be ignored",
-        email=None,
-        age=999,
-    )
-
-    updated_user = await service.update_by_id_with_fields(
-        user_id, update_data, fields_to_update=["email"]
-    )
-    await service.session.commit()
-
-    if updated_user:
-        print(f"✓ Обновлен только email для ID={user_id}:")
-        print(f"  Email: {updated_user.email} (NULL)")
-        print(f"  Name: {updated_user.name} (не изменился)")
-        print(f"  Age: {updated_user.age} (не изменился)")
-
-
 # ==================== ПРИМЕРЫ УДАЛЕНИЯ ====================
 
 

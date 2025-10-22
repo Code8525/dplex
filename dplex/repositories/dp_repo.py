@@ -63,6 +63,23 @@ class DPRepo(Generic[ModelType, KeyType]):
         """Найти сущности по списку ID"""
         return await self.query().where(self.id_in(entity_ids)).find_all()
 
+    async def delete_by_query_builder(
+        self,
+        query_builder: "QueryBuilder[ModelType]",
+    ) -> None:
+        """
+        Массовое удаление по условиям из QueryBuilder.
+        Использует централизованную логику построения WHERE.
+        """
+        condition = self._build_where_clause_from_builder(query_builder)
+        if condition is None:
+            raise ValueError(
+                "DPRepo.delete_by_query_builder: требуется хотя бы одно условие WHERE для массового удаления"
+            )
+
+        stmt = delete(self.model).where(condition)
+        await self.session.execute(stmt)
+
     async def delete_by_id(self, entity_id: KeyType) -> None:
         """Удалить сущность по ID"""
         stmt = delete(self.model).where(self.id_eq(entity_id))
@@ -71,6 +88,48 @@ class DPRepo(Generic[ModelType, KeyType]):
     async def delete_by_ids(self, entity_ids: list[KeyType]) -> None:
         """Удалить сущности по ID"""
         stmt = delete(self.model).where(self.id_in(entity_ids))
+        await self.session.execute(stmt)
+
+    async def update(
+        self,
+        where: ColumnElement[bool] | list[ColumnElement[bool]] | None,
+        values: dict[str, Any],
+    ) -> None:
+        """
+        Универсальный UPDATE по условию(ям).
+        """
+        if not values:
+            return None
+        if where is None:
+            raise ValueError("DPRepo.update: пустой WHERE запрещён")
+
+        condition: ColumnElement[bool]
+        if isinstance(where, list):
+            if not where:
+                raise ValueError("DPRepo.update: пустой список условий WHERE запрещён")
+            condition = and_(*where)
+        else:
+            condition = where
+
+        stmt = update(self.model).where(condition).values(**values)
+        await self.session.execute(stmt)
+
+    async def update_by_query_builder(
+        self,
+        query_builder: "QueryBuilder[ModelType]",
+        values: dict[str, Any],
+    ) -> None:
+        # ...
+        if not values:
+            return None
+
+        condition = self._build_where_clause_from_builder(query_builder)
+        if condition is None:
+            raise ValueError(
+                "DPRepo.update_by_query_builder: требуется хотя бы одно условие WHERE"
+            )
+
+        stmt = update(self.model).where(condition).values(**values)
         await self.session.execute(stmt)
 
     async def update_by_id(self, entity_id: KeyType, values: dict[str, Any]) -> None:
@@ -100,13 +159,25 @@ class DPRepo(Generic[ModelType, KeyType]):
         self.session.add_all(entities)
         return entities
 
-    async def save_changes(self) -> None:
+    async def commit(self) -> None:
         """Сохранить изменения в базе данных"""
         await self.session.commit()
 
     async def rollback(self) -> None:
         """Откатить изменения"""
         await self.session.rollback()
+
+    @staticmethod
+    def _build_where_clause_from_builder(
+        builder: "QueryBuilder[ModelType]",
+    ) -> ColumnElement[bool] | None:
+        """
+        Строит единое WHERE условие из фильтров QueryBuilder'а.
+        Возвращает None, если фильтров нет.
+        """
+        if builder.filters:
+            return and_(*builder.filters)
+        return None
 
     # Методы для выполнения запросов билдера
     async def execute_typed_query(
@@ -115,8 +186,9 @@ class DPRepo(Generic[ModelType, KeyType]):
         """Выполнить типизированный запрос"""
         stmt = select(self.model)
 
-        if builder.filters:
-            stmt = stmt.where(and_(*builder.filters))
+        condition = self._build_where_clause_from_builder(builder)
+        if condition is not None:
+            stmt = stmt.where(condition)
 
         if builder.order_by_clauses:
             stmt = stmt.order_by(*builder.order_by_clauses)
@@ -134,8 +206,10 @@ class DPRepo(Generic[ModelType, KeyType]):
         """Подсчитать записи через типизированный билдер"""
         stmt = select(func.count()).select_from(self.model)
 
-        if builder.filters:
-            stmt = stmt.where(and_(*builder.filters))
+        # Используем новый хелпер
+        condition = self._build_where_clause_from_builder(builder)
+        if condition is not None:
+            stmt = stmt.where(condition)
 
         result = await self.session.execute(stmt)
         return result.scalar_one()
