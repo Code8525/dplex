@@ -1,16 +1,33 @@
+"""Базовый репозиторий для работы с SQLAlchemy моделями"""
+
 import uuid
 from typing import Any, Generic
 
-from sqlalchemy import select, func, and_, delete, ColumnElement, update
+from sqlalchemy import ColumnElement, and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
 from dplex.repositories.query_builder import QueryBuilder
-from dplex.types import ModelType, KeyType
+from dplex.types import KeyType, ModelType
 
 
 class DPRepo(Generic[ModelType, KeyType]):
-    """Базовый репозиторий с улучшенной типизацией"""
+    """
+    Базовый репозиторий для работы с SQLAlchemy моделями
+
+    Предоставляет стандартные CRUD операции и интеграцию с QueryBuilder
+    для построения сложных запросов. Поддерживает различные типы первичных ключей.
+
+    Type Parameters:
+        ModelType: Тип SQLAlchemy модели
+        KeyType: Тип первичного ключа (int, str, uuid.UUID)
+
+    Attributes:
+        model: Класс SQLAlchemy модели
+        session: Асинхронная сессия SQLAlchemy
+        key_type: Тип первичного ключа
+        id_field_name: Имя поля первичного ключа в модели
+    """
 
     def __init__(
         self,
@@ -19,6 +36,21 @@ class DPRepo(Generic[ModelType, KeyType]):
         key_type: type[KeyType] = uuid.UUID,
         id_field_name: str = "id",
     ) -> None:
+        """
+        Инициализация репозитория
+
+        Args:
+            model: Класс SQLAlchemy модели
+            session: Асинхронная сессия SQLAlchemy
+            key_type: Тип первичного ключа (по умолчанию uuid.UUID)
+            id_field_name: Имя поля первичного ключа (по умолчанию "id")
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: Если поле id_field_name отсутствует в модели или не является SQLAlchemy колонкой
+        """
         self.model = model
         self.session = session
         self.key_type = key_type
@@ -26,41 +58,82 @@ class DPRepo(Generic[ModelType, KeyType]):
         self._id_column = self._get_id_column()
 
     def _get_id_column(self) -> InstrumentedAttribute[KeyType]:
-        """Получить типизированную ID колонку"""
+        """
+        Получить типизированную ID колонку модели
+
+        Returns:
+            SQLAlchemy колонка первичного ключа
+
+        Raises:
+            ValueError: Если поле не найдено или не является SQLAlchemy колонкой
+        """
         if not hasattr(self.model, self.id_field_name):
             raise ValueError(
                 f"Model {self.model.__name__} does not have field '{self.id_field_name}'"
             )
-
         column = getattr(self.model, self.id_field_name)
-
         # Проверяем что это SQLAlchemy column
         if not hasattr(column, "property"):
             raise ValueError(
                 f"Field '{self.id_field_name}' in {self.model.__name__} is not a SQLAlchemy column"
             )
-
         return column
 
     def query(self) -> "QueryBuilder[ModelType]":
-        """Создать типизированный query builder"""
+        """
+        Создать типизированный query builder
+
+        Returns:
+            Новый экземпляр QueryBuilder для построения запросов
+        """
         return QueryBuilder(self, self.model)
 
     def id_eq(self, value: KeyType) -> ColumnElement[bool]:
-        """Возвращает условие для сравнения ID с entity_id"""
+        """
+        Создать условие для сравнения ID с заданным значением
+
+        Args:
+            value: Значение ID для сравнения
+
+        Returns:
+            SQLAlchemy условие (id == value)
+        """
         return self._id_column == value
 
     def id_in(self, values: list[KeyType]) -> ColumnElement[bool]:
-        """Возвращает условие для проверки ID в списке значений"""
+        """
+        Создать условие для проверки ID в списке значений
+
+        Args:
+            values: Список значений ID
+
+        Returns:
+            SQLAlchemy условие (id IN values)
+        """
         return self._id_column.in_(values)
 
-    # Методы с использованием закешированной колонки
     async def find_by_id(self, entity_id: KeyType) -> ModelType | None:
-        """Найти сущность по ID"""
+        """
+        Найти сущность по ID
+
+        Args:
+            entity_id: ID сущности
+
+        Returns:
+            Модель или None если не найдена
+        """
         return await self.query().where(self.id_eq(entity_id)).find_one()
 
     async def find_by_ids(self, entity_ids: list[KeyType]) -> list[ModelType]:
-        """Найти сущности по списку ID"""
+        """
+        Найти сущности по списку ID
+
+        Args:
+            entity_ids: Список ID сущностей
+
+        Returns:
+            Список найденных моделей
+        """
         return await self.query().where(self.id_in(entity_ids)).find_all()
 
     async def delete_by_query_builder(
@@ -68,25 +141,50 @@ class DPRepo(Generic[ModelType, KeyType]):
         query_builder: "QueryBuilder[ModelType]",
     ) -> None:
         """
-        Массовое удаление по условиям из QueryBuilder.
+        Массовое удаление по условиям из QueryBuilder
+
         Использует централизованную логику построения WHERE.
+
+        Args:
+            query_builder: QueryBuilder с условиями фильтрации
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: Если не указано ни одного условия WHERE
         """
         condition = self._build_where_clause_from_builder(query_builder)
         if condition is None:
             raise ValueError(
                 "DPRepo.delete_by_query_builder: требуется хотя бы одно условие WHERE для массового удаления"
             )
-
         stmt = delete(self.model).where(condition)
         await self.session.execute(stmt)
 
     async def delete_by_id(self, entity_id: KeyType) -> None:
-        """Удалить сущность по ID"""
+        """
+        Удалить сущность по ID
+
+        Args:
+            entity_id: ID сущности для удаления
+
+        Returns:
+            None
+        """
         stmt = delete(self.model).where(self.id_eq(entity_id))
         await self.session.execute(stmt)
 
     async def delete_by_ids(self, entity_ids: list[KeyType]) -> None:
-        """Удалить сущности по ID"""
+        """
+        Удалить сущности по списку ID
+
+        Args:
+            entity_ids: Список ID сущностей для удаления
+
+        Returns:
+            None
+        """
         stmt = delete(self.model).where(self.id_in(entity_ids))
         await self.session.execute(stmt)
 
@@ -96,10 +194,21 @@ class DPRepo(Generic[ModelType, KeyType]):
         values: dict[str, Any],
     ) -> None:
         """
-        Универсальный UPDATE по условию(ям).
+        Универсальный UPDATE по условию(ям)
+
+        Args:
+            where: Условие WHERE (одно или список условий)
+            values: Словарь с обновляемыми полями и значениями
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: Если where равен None или пустой список
         """
         if not values:
             return None
+
         if where is None:
             raise ValueError("DPRepo.update: пустой WHERE запрещён")
 
@@ -119,7 +228,19 @@ class DPRepo(Generic[ModelType, KeyType]):
         query_builder: "QueryBuilder[ModelType]",
         values: dict[str, Any],
     ) -> None:
-        # ...
+        """
+        Массовое обновление по условиям из QueryBuilder
+
+        Args:
+            query_builder: QueryBuilder с условиями фильтрации
+            values: Словарь с обновляемыми полями и значениями
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: Если не указано ни одного условия WHERE
+        """
         if not values:
             return None
 
@@ -133,38 +254,98 @@ class DPRepo(Generic[ModelType, KeyType]):
         await self.session.execute(stmt)
 
     async def update_by_id(self, entity_id: KeyType, values: dict[str, Any]) -> None:
-        """Обновить сущность по ID"""
+        """
+        Обновить сущность по ID
+
+        Args:
+            entity_id: ID сущности
+            values: Словарь с обновляемыми полями и значениями
+
+        Returns:
+            None
+        """
         stmt = update(self.model).where(self.id_eq(entity_id)).values(**values)
         await self.session.execute(stmt)
 
     async def update_by_ids(
         self, entity_ids: list[KeyType], values: dict[str, Any]
     ) -> None:
-        """Обновить сущности по ID"""
+        """
+        Обновить сущности по списку ID
+
+        Args:
+            entity_ids: Список ID сущностей
+            values: Словарь с обновляемыми полями и значениями
+
+        Returns:
+            None
+        """
         stmt = update(self.model).where(self.id_in(entity_ids)).values(**values)
         await self.session.execute(stmt)
 
     async def exists_by_id(self, entity_id: KeyType) -> bool:
-        """Проверить существование сущности по ID"""
+        """
+        Проверить существование сущности по ID
+
+        Args:
+            entity_id: ID сущности
+
+        Returns:
+            True если сущность существует, иначе False
+        """
         count = await self.query().where(self.id_eq(entity_id)).count()
         return count > 0
 
     async def create(self, entity: ModelType) -> ModelType:
-        """Создать новую сущность"""
+        """
+        Создать новую сущность
+
+        Добавляет сущность в сессию. Требует вызов commit() для сохранения.
+
+        Args:
+            entity: Экземпляр модели для создания
+
+        Returns:
+            Созданный экземпляр модели
+        """
         self.session.add(entity)
         return entity
 
     async def create_bulk(self, entities: list[ModelType]) -> list[ModelType]:
-        """Создать несколько сущностей"""
+        """
+        Создать несколько сущностей
+
+        Добавляет сущности в сессию. Требует вызов commit() для сохранения.
+
+        Args:
+            entities: Список экземпляров модели для создания
+
+        Returns:
+            Список созданных экземпляров модели
+        """
         self.session.add_all(entities)
         return entities
 
     async def commit(self) -> None:
-        """Сохранить изменения в базе данных"""
+        """
+        Сохранить изменения в базе данных
+
+        Фиксирует все изменения в текущей транзакции.
+
+        Returns:
+            None
+        """
         await self.session.commit()
 
     async def rollback(self) -> None:
-        """Откатить изменения"""
+        """
+        Откатить изменения
+
+        Отменяет все изменения в текущей транзакции.
+
+        Returns:
+            None
+        """
         await self.session.rollback()
 
     @staticmethod
@@ -172,18 +353,32 @@ class DPRepo(Generic[ModelType, KeyType]):
         builder: "QueryBuilder[ModelType]",
     ) -> ColumnElement[bool] | None:
         """
-        Строит единое WHERE условие из фильтров QueryBuilder'а.
-        Возвращает None, если фильтров нет.
+        Построить единое WHERE условие из фильтров QueryBuilder
+
+        Args:
+            builder: QueryBuilder с условиями фильтрации
+
+        Returns:
+            Объединенное условие WHERE или None если фильтров нет
         """
         if builder.filters:
             return and_(*builder.filters)
         return None
 
-    # Методы для выполнения запросов билдера
     async def execute_typed_query(
         self, builder: "QueryBuilder[ModelType]"
     ) -> list[ModelType]:
-        """Выполнить типизированный запрос"""
+        """
+        Выполнить типизированный запрос из QueryBuilder
+
+        Применяет все условия фильтрации, сортировки и пагинации из builder.
+
+        Args:
+            builder: QueryBuilder с параметрами запроса
+
+        Returns:
+            Список найденных моделей
+        """
         stmt = select(self.model)
 
         condition = self._build_where_clause_from_builder(builder)
@@ -203,10 +398,19 @@ class DPRepo(Generic[ModelType, KeyType]):
         return list(result.all())
 
     async def execute_typed_count(self, builder: "QueryBuilder[ModelType]") -> int:
-        """Подсчитать записи через типизированный билдер"""
+        """
+        Подсчитать записи через типизированный QueryBuilder
+
+        Применяет только условия фильтрации из builder.
+
+        Args:
+            builder: QueryBuilder с условиями фильтрации
+
+        Returns:
+            Количество записей
+        """
         stmt = select(func.count()).select_from(self.model)
 
-        # Используем новый хелпер
         condition = self._build_where_clause_from_builder(builder)
         if condition is not None:
             stmt = stmt.where(condition)

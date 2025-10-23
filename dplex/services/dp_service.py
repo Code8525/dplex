@@ -1,22 +1,22 @@
-"""Базовый сервис для бизнес-логики с ПОЛНОЙ автоматизацией"""
+"""Базовый сервис для бизнес-логики с автоматизацией фильтрации, сортировки и CRUD операций"""
 
 from typing import Any, Generic
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from dplex.repositories.dp_repo import DPRepo
-from dplex.services.filter_applier import FilterApplier
 from dplex.services.dp_filters import DPFilters
-from dplex.services.sort import Sort, Order
+from dplex.services.filter_applier import FilterApplier
+from dplex.services.sort import Order, Sort
 from dplex.types import (
-    ModelType,
-    KeyType,
     CreateSchemaType,
-    UpdateSchemaType,
-    ResponseSchemaType,
     FilterSchemaType,
+    KeyType,
+    ModelType,
+    ResponseSchemaType,
     SortFieldSchemaType,
+    UpdateSchemaType,
 )
 
 
@@ -32,7 +32,13 @@ class DPService(
     ]
 ):
     """
-    Базовый сервис
+    Базовый сервис для бизнес-логики с автоматизацией
+
+    Предоставляет полный набор CRUD операций с автоматической обработкой:
+    - Фильтрации через DPFilters
+    - Сортировки через Sort объекты
+    - Пагинации (limit/offset)
+    - Преобразования между моделями и схемами
 
     Type Parameters:
         ModelType: SQLAlchemy модель
@@ -42,6 +48,12 @@ class DPService(
         ResponseSchemaType: Pydantic схема для ответа
         FilterSchemaType: Схема фильтрации (наследник DPFilters)
         SortFieldSchemaType: Enum полей для сортировки
+
+    Attributes:
+        repository: Репозиторий для доступа к данным
+        session: Асинхронная SQLAlchemy сессия
+        response_schema: Класс Pydantic схемы для ответа
+        filter_applier: Экземпляр FilterApplier для применения фильтров
     """
 
     def __init__(
@@ -55,8 +67,11 @@ class DPService(
 
         Args:
             repository: Репозиторий для доступа к данным
-            session: Async SQLAlchemy сессия
+            session: Асинхронная SQLAlchemy сессия
             response_schema: Класс Pydantic схемы для ответа
+
+        Returns:
+            None
         """
         self.repository = repository
         self.session = session
@@ -67,32 +82,50 @@ class DPService(
 
     def _model_to_schema(self, model: ModelType) -> ResponseSchemaType:
         """
-        АВТОМАТИЧЕСКОЕ преобразование SQLAlchemy модели в Pydantic схему
+        Автоматическое преобразование SQLAlchemy модели в Pydantic схему
 
-        Использует model_validate из Pydantic.
+        Использует model_validate из Pydantic для преобразования.
+
+        Args:
+            model: Экземпляр SQLAlchemy модели
+
+        Returns:
+            Экземпляр Pydantic схемы ответа
         """
         return self.response_schema.model_validate(model)
 
     def _create_schema_to_model(self, schema: CreateSchemaType) -> ModelType:
         """
-        АВТОМАТИЧЕСКОЕ преобразование схемы создания в SQLAlchemy модель
+        Автоматическое преобразование схемы создания в SQLAlchemy модель
 
         Работает через model_dump() и **kwargs в конструктор модели.
+
+        Args:
+            schema: Схема создания с данными
+
+        Returns:
+            Новый экземпляр SQLAlchemy модели
         """
         if isinstance(schema, BaseModel):
             data = schema.model_dump(exclude_none=True)
         else:
             data = schema.__dict__
-
         return self.repository.model(**data)
 
     def _apply_filter_to_query(
         self, query_builder: Any, filter_data: FilterSchemaType
     ) -> Any:
         """
-        АВТОМАТИЧЕСКОЕ применение фильтров к query builder
+        Автоматическое применение фильтров к query builder
 
         Работает с DPFilters - автоматически применяет все активные фильтры.
+
+        Args:
+            query_builder: QueryBuilder для добавления фильтров
+            filter_data: Схема фильтра (DPFilters)
+
+        Returns:
+            QueryBuilder с примененными фильтрами
         """
         # Если filter_data это наследник DPFilters
         if isinstance(filter_data, DPFilters):
@@ -100,15 +133,20 @@ class DPService(
             query_builder = self.filter_applier.apply_filters_from_schema(
                 query_builder, self.repository.model, filter_data
             )
-
         return query_builder
 
     @staticmethod
     def _sort_field_to_column_name(sort_field: SortFieldSchemaType) -> str:
         """
-        АВТОМАТИЧЕСКОЕ преобразование enum поля сортировки в имя колонки
+        Автоматическое преобразование enum поля сортировки в имя колонки
 
         Использует .value из enum (для StrEnum это будет имя колонки).
+
+        Args:
+            sort_field: Enum поле для сортировки
+
+        Returns:
+            Имя колонки в виде строки
         """
         return str(sort_field.value)
 
@@ -168,14 +206,11 @@ class DPService(
         for sort_item in sort_list:
             column_name = self._sort_field_to_column_name(sort_item.by)
             column = self._get_model_column(column_name)
-
             desc_order = sort_item.order == Order.DESC
-
             # Используем order_by_with_nulls для поддержки nulls placement
             query_builder = query_builder.order_by_with_nulls(
                 column, desc_order=desc_order, nulls_placement=sort_item.nulls
             )
-
         return query_builder
 
     def _get_sort_from_filter(
@@ -193,43 +228,26 @@ class DPService(
         # DPFilters гарантирует наличие поля sort
         if isinstance(filter_data, DPFilters):
             return self._normalize_sort_list(filter_data.sort)
-
         return []
 
     @staticmethod
     def _make_update_dict(update_data: BaseModel) -> dict[str, Any]:
         """
-        Формирует словарь для частичного обновления записи в базе данных из Pydantic-модели.
+        Сформировать словарь для частичного обновления записи
 
         Метод анализирует модель и возвращает только те поля, которые были
-        реально переданы пользователем при создании экземпляра (на основе `model_fields_set`).
-        Таким образом:
-        - Поля, не переданные пользователем, не попадают в результат.
-        - Поля, переданные со значением `None`, будут установлены в `NULL` в БД.
-        - Поля, переданные с любым другим значением, обновляются этим значением.
+        реально переданы пользователем при создании экземпляра (на основе model_fields_set).
+
+        Логика:
+        - Поля, не переданные пользователем, не попадают в результат
+        - Поля, переданные со значением None, будут установлены в NULL в БД
+        - Поля, переданные с любым другим значением, обновляются этим значением
 
         Args:
-            update_data (BaseModel): экземпляр Pydantic-модели, например `UserUpdate`.
+            update_data: Экземпляр Pydantic модели обновления
 
         Returns:
-            dict[str, object]: словарь с парами {имя_поля: значение} для передачи
-            в метод репозитория (например `repository.update(...)`).
-
-        Примеры:
-            >>> from examples.service import UserService
-            >>> class UserUpdate(BaseModel):
-            ...     name: str | None = None
-            ...     email: str | None = None
-            ...
-            >>> # Пользователь ничего не передал
-            >>> UserService._make_update_dict(UserUpdate())
-            {}
-            >>> # Пользователь обнуляет поле
-            >>> UserService._make_update_dict(UserUpdate(email=None))
-            {'email': None}
-            >>> # Пользователь обновляет имя
-            >>> UserService._make_update_dict(UserUpdate(name="John"))
-            {'name': 'John'}
+            Словарь с парами {имя_поля: значение} для передачи в репозиторий
         """
         return update_data.model_dump(exclude_unset=True)
 
@@ -239,7 +257,7 @@ class DPService(
         """
         Применить базовые фильтры: фильтрация, сортировка, limit, offset
 
-        АВТОМАТИЧЕСКИ извлекает всё из DPFilters.
+        Автоматически извлекает всё из DPFilters.
 
         Args:
             query_builder: QueryBuilder
@@ -312,7 +330,7 @@ class DPService(
         """
         Получить все сущности с фильтрацией и сортировкой
 
-        АВТОМАТИЧЕСКИ применяет все фильтры, сортировку, limit и offset из DPFilters.
+        Автоматически применяет все фильтры, сортировку, limit и offset из DPFilters.
 
         Args:
             filter_data: Схема фильтра с параметрами поиска (DPFilters)
@@ -410,6 +428,11 @@ class DPService(
         Returns:
             Список схем ответа с созданными сущностями
         """
+        if not create_data_list:
+            raise ValueError(
+                "DPService.create_bulk: Список для создания не может быть пустым"
+            )
+
         models = [self._create_schema_to_model(data) for data in create_data_list]
         created_models = await self.repository.create_bulk(models)
         await self.session.flush()
@@ -421,12 +444,17 @@ class DPService(
         update_data: UpdateSchemaType,
     ) -> None:
         """
-        Массовое обновление по параметрам query_builder (только WHERE из фильтров).
+        Массовое обновление по фильтрам
 
-        Логика:
-          - build query_builder
-          - применить ТОЛЬКО фильтры (_apply_filter_to_query)
-          - выполнить repo.update_by_query_builder(...)
+        Применяет только фильтры из filter_data (без сортировки, limit, offset).
+        Обновляет только поля, явно переданные в update_data.
+
+        Args:
+            filter_data: Схема фильтра для выборки записей
+            update_data: Схема обновления с новыми данными
+
+        Returns:
+            None
         """
         # 1) Собираем только реально переданные пользователем поля
         update_dict = self._make_update_dict(update_data)
@@ -452,9 +480,17 @@ class DPService(
         Args:
             entity_id: Первичный ключ
             update_data: Схема обновления с новыми данными
+
+        Returns:
+            None
         """
         update_dict = self._make_update_dict(update_data)
+
+        if not update_dict:
+            return
+
         await self.repository.update_by_id(entity_id, update_dict)
+        await self.session.flush()
 
     async def update_by_ids(
         self,
@@ -467,24 +503,29 @@ class DPService(
         Args:
             entity_ids: Список первичных ключей
             update_data: Схема обновления (одинаковая для всех)
+
+        Returns:
+            None
         """
         update_dict = self._make_update_dict(update_data)
+
+        if not update_dict:
+            return
+
         await self.repository.update_by_ids(entity_ids, update_dict)
+        await self.session.flush()
 
     async def delete(self, filter_data: FilterSchemaType) -> None:
         """
-        Массовое удаление записей по фильтрам.
+        Массовое удаление записей по фильтрам
 
-        Логика:
-          - Создает QueryBuilder.
-          - Применяет к нему фильтры с помощью `_apply_filter_to_query`.
-          - Вызывает метод репозитория для выполнения массового DELETE.
+        Создает QueryBuilder, применяет фильтры и выполняет массовое DELETE.
 
         Args:
-            filter_data: Схема с параметрами фильтрации (DPFilters).
+            filter_data: Схема с параметрами фильтрации (DPFilters)
 
         Returns:
-            Количество удаленных записей.
+            None
         """
         # 1. Создаем билдер и применяем к нему ТОЛЬКО фильтры.
         qb = self.repository.query()
@@ -492,9 +533,8 @@ class DPService(
 
         # 2. Выполняем массовое удаление через репозиторий.
         await self.repository.delete_by_query_builder(qb)
-        await self.session.flush()
 
-    async def delete_by_id(self, entity_id: KeyType) -> bool:
+    async def delete_by_id(self, entity_id: KeyType) -> None:
         """
         Удалить сущность по ID
 
@@ -504,14 +544,10 @@ class DPService(
         Returns:
             True если сущность была удалена, False если не существовала
         """
-        exists = await self.repository.exists_by_id(entity_id)
-        if not exists:
-            return False
-
         await self.repository.delete_by_id(entity_id)
-        return True
+        return
 
-    async def delete_by_ids(self, entity_ids: list[KeyType]) -> int:
+    async def delete_by_ids(self, entity_ids: list[KeyType]) -> None:
         """
         Удалить несколько сущностей по списку ID
 
@@ -522,13 +558,11 @@ class DPService(
             Количество фактически удаленных записей
         """
         # Проверяем какие сущности существуют
-        existing_models = await self.repository.find_by_ids(entity_ids)
-        existing_count = len(existing_models)
 
-        if existing_count > 0:
-            await self.repository.delete_by_ids(entity_ids)
+        if not entity_ids:
+            return
 
-        return existing_count
+        await self.repository.delete_by_ids(entity_ids)
 
     async def paginate(
         self, page: int, per_page: int, filter_data: FilterSchemaType
@@ -536,7 +570,7 @@ class DPService(
         """
         Пагинация с фильтрацией и сортировкой
 
-        АВТОМАТИЧЕСКИ использует DPFilters для фильтрации и сортировки.
+        Автоматически использует DPFilters для фильтрации и сортировки.
 
         Args:
             page: Номер страницы (начиная с 1)

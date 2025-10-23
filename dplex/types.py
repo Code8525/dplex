@@ -1,3 +1,5 @@
+"""Типы данных для системы фильтрации, сортировки и работы с моделями"""
+
 import uuid
 from enum import StrEnum
 from typing import TypeVar
@@ -6,33 +8,87 @@ from pydantic import BaseModel
 from sqlalchemy.orm import DeclarativeBase
 
 from dplex.services.filters import (
-    StringFilter,
-    DateTimeFilter,
-    NumberFilter,
+    BaseDateTimeFilter,
+    BaseNumberFilter,
     BooleanFilter,
     DateFilter,
-    TimestampFilter,
-    FloatFilter,
+    DateTimeFilter,
     DecimalFilter,
-    BaseNumberFilter,
-    TimeFilter,
-    IntFilter,
     EnumFilter,
+    FloatFilter,
+    IntFilter,
+    StringFilter,
+    TimeFilter,
+    TimestampFilter,
     UUIDFilter,
 )
 
+
 ModelType = TypeVar("ModelType", bound=DeclarativeBase)
+"""
+TypeVar для SQLAlchemy моделей
+
+Используется для типизации методов репозиториев и сервисов,
+работающих с моделями базы данных.
+"""
 
 KeyType = TypeVar("KeyType", int, str, uuid.UUID)
+"""
+TypeVar для типов первичных ключей
+
+Ограничен стандартными типами первичных ключей:
+- int: Автоинкрементные числовые ID
+- str: Строковые идентификаторы
+- uuid.UUID: UUID идентификаторы
+"""
+
 ResponseSchemaType = TypeVar("ResponseSchemaType", bound=BaseModel)
+"""
+TypeVar для Pydantic схем ответа
+
+Используется для типизации схем, возвращаемых из API endpoints.
+Должен быть подклассом BaseModel от Pydantic.
+"""
+
 CreateSchemaType = TypeVar("CreateSchemaType")
+"""
+TypeVar для схем создания записей
+
+Используется для типизации данных при создании новых записей в БД.
+Обычно это Pydantic модели без полей id, created_at и т.д.
+"""
+
 UpdateSchemaType = TypeVar("UpdateSchemaType")
+"""
+TypeVar для схем обновления записей
+
+Используется для типизации данных при обновлении существующих записей.
+Обычно все поля опциональны для частичного обновления (PATCH).
+"""
+
 FilterSchemaType = TypeVar("FilterSchemaType")
+"""
+TypeVar для схем фильтрации
+
+Используется для типизации схем, содержащих параметры фильтрации.
+Обычно наследуется от DPFilters.
+"""
 
 SortFieldSchemaType = TypeVar("SortFieldSchemaType")
+"""
+TypeVar для схем полей сортировки
 
-# Generic type для поля сортировки
+Используется для типизации доступных полей для сортировки.
+Обычно это StrEnum с именами полей модели.
+"""
+
 SortByType = TypeVar("SortByType", bound=StrEnum)
+"""
+TypeVar для типа поля сортировки
+
+Ограничен StrEnum для обеспечения типобезопасности при сортировке.
+Используется в Sort[SortByType] и DPFilters[SortByType].
+"""
 
 FilterType = (
     StringFilter
@@ -40,6 +96,7 @@ FilterType = (
     | FloatFilter
     | DecimalFilter
     | BaseNumberFilter
+    | BaseDateTimeFilter
     | DateTimeFilter
     | DateFilter
     | TimeFilter
@@ -48,3 +105,23 @@ FilterType = (
     | EnumFilter
     | UUIDFilter
 )
+"""
+Union тип всех доступных фильтров
+
+Используется для типизации методов, принимающих любой тип фильтра.
+Включает все специализированные классы фильтров из dplex.services.filters.
+
+Типы фильтров:
+    - StringFilter: Фильтрация строковых полей
+    - IntFilter: Фильтрация целых чисел
+    - FloatFilter: Фильтрация чисел с плавающей точкой
+    - DecimalFilter: Фильтрация точных десятичных чисел
+    - BaseNumberFilter: Базовый числовой фильтр
+    - DateTimeFilter: Фильтрация даты и времени
+    - DateFilter: Фильтрация только дат
+    - TimeFilter: Фильтрация только времени
+    - TimestampFilter: Фильтрация Unix timestamp
+    - BooleanFilter: Фильтрация булевых значений
+    - EnumFilter: Фильтрация enum полей
+    - UUIDFilter: Фильтрация UUID полей
+"""

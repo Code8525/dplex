@@ -1,32 +1,52 @@
-# file: dplex/services/filter_applier.py
+"""Применение фильтров к query builder для построения SQL запросов"""
+
 import datetime
 from decimal import Decimal
 from enum import Enum
-from tracemalloc import BaseFilter
 from typing import Any, Protocol
 from uuid import UUID
 
 from dplex.services.dp_filters import DPFilters
 from dplex.services.filters import (
-    StringFilter,
-    BooleanFilter,
-    BaseNumberFilter,
-    IntFilter,
-    FloatFilter,
-    DecimalFilter,
     BaseDateTimeFilter,
-    DateTimeFilter,
+    BaseNumberFilter,
+    BooleanFilter,
     DateFilter,
+    DateTimeFilter,
+    DecimalFilter,
+    EnumFilter,
+    FloatFilter,
+    IntFilter,
+    StringFilter,
     TimeFilter,
     TimestampFilter,
-    EnumFilter,
     UUIDFilter,
 )
 from dplex.types import FilterType
 
 
 class SupportsFiltering(Protocol):
-    """Protocol for query builders that support filtering operations"""
+    """
+    Протокол для query builder с поддержкой операций фильтрации
+
+    Определяет интерфейс, который должен реализовать query builder
+    для работы с FilterApplier. Включает все базовые операции фильтрации SQL.
+
+    Methods:
+        where_eq: Фильтр равенства (column = value)
+        where_ne: Фильтр неравенства (column != value)
+        where_in: Фильтр вхождения в список (column IN (...))
+        where_not_in: Фильтр исключения из списка (column NOT IN (...))
+        where_is_null: Проверка на NULL (column IS NULL)
+        where_is_not_null: Проверка на NOT NULL (column IS NOT NULL)
+        where_gt: Больше чем (column > value)
+        where_gte: Больше или равно (column >= value)
+        where_lt: Меньше чем (column < value)
+        where_lte: Меньше или равно (column <= value)
+        where_between: В диапазоне (column BETWEEN start AND end)
+        where_like: Соответствие шаблону с учетом регистра (column LIKE pattern)
+        where_ilike: Соответствие шаблону без учета регистра (column ILIKE pattern)
+    """
 
     def where_eq(self, column: Any, value: Any) -> Any: ...
 
@@ -56,13 +76,41 @@ class SupportsFiltering(Protocol):
 
 
 class FilterApplier:
-    """Класс для применения базовых фильтров к query builder"""
+    """
+    Класс для применения фильтров к query builder
+
+    Предоставляет методы для применения различных типов фильтров
+    (строковые, числовые, временные и т.д.) к query builder.
+    Поддерживает автоматическое определение типа фильтра и применение
+    всех фильтров из схемы DPFilters.
+
+    Examples:
+        >>> from dplex.services.filter_applier import FilterApplier
+        >>> from dplex.services.filters import StringFilter, IntFilter
+        >>>
+        >>> applier = FilterApplier()
+        >>>
+        >>> # Применение строкового фильтра
+        >>> name_filter = StringFilter(icontains="john")
+        >>> query = applier.apply_string_filter(query_builder, User.name, name_filter)
+        >>>
+        >>> # Применение числового фильтра
+        >>> age_filter = IntFilter(gte=18, lte=65)
+        >>> query = applier.apply_base_number_filter(query_builder, User.age, age_filter)
+        >>>
+        >>> # Применение всех фильтров из схемы
+        >>> filters = UserFilters(name=StringFilter(icontains="john"), age=IntFilter(gte=18))
+        >>> query = applier.apply_filters_from_schema(query_builder, User, filters)
+
+    Attributes:
+        _STRING_OPS: Набор ключей строковых операций для определения типа
+        _COMPARISON_OPS: Набор ключей операций сравнения для определения типа
+    """
 
     # String operation keys for type detection
     _STRING_OPS = frozenset(
         ["contains", "icontains", "starts_with", "ends_with", "like", "ilike"]
     )
-
     # Comparison operation keys for type detection
     _COMPARISON_OPS = frozenset(["gt", "gte", "lt", "lte", "between", "from_", "to"])
 
@@ -70,33 +118,40 @@ class FilterApplier:
     def _apply_common_ops(
         query_builder: SupportsFiltering, column: Any, filter_data: FilterType
     ) -> SupportsFiltering:
-        """Применить общие операции фильтрации (eq, ne, in_, not_in, is_null, is_not_null)"""
+        """
+        Применить общие операции фильтрации
+
+        Применяет операции, доступные для всех типов фильтров:
+        eq, ne, in_, not_in, is_null, is_not_null.
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            column: Колонка модели для фильтрации
+            filter_data: Экземпляр фильтра с данными
+
+        Returns:
+            Query builder с примененными общими операциями
+        """
         if hasattr(filter_data, "eq") and filter_data.eq is not None:
             query_builder = query_builder.where_eq(column, filter_data.eq)
-
         if hasattr(filter_data, "ne") and filter_data.ne is not None:
             query_builder = query_builder.where_ne(column, filter_data.ne)
-
         if hasattr(filter_data, "in_") and filter_data.in_ is not None:
             query_builder = query_builder.where_in(column, filter_data.in_)
-
         if hasattr(filter_data, "not_in") and filter_data.not_in is not None:
             query_builder = query_builder.where_not_in(column, filter_data.not_in)
-
         if (
             hasattr(filter_data, "is_null")
             and filter_data.is_null is not None
             and filter_data.is_null
         ):
             query_builder = query_builder.where_is_null(column)
-
         if (
             hasattr(filter_data, "is_not_null")
             and filter_data.is_not_null is not None
             and filter_data.is_not_null
         ):
             query_builder = query_builder.where_is_not_null(column)
-
         return query_builder
 
     @staticmethod
@@ -105,69 +160,92 @@ class FilterApplier:
         column: Any,
         filter_data: Any,  # BaseNumberFilter or BaseDateTimeFilter
     ) -> SupportsFiltering:
-        """Применить операции сравнения (gt, gte, lt, lte, between)"""
+        """
+        Применить операции сравнения
+
+        Применяет операции: gt, gte, lt, lte, between.
+        Также обрабатывает алиасы from_ и to для временных фильтров.
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            column: Колонка модели для фильтрации
+            filter_data: Экземпляр числового или временного фильтра
+
+        Returns:
+            Query builder с примененными операциями сравнения
+        """
         if hasattr(filter_data, "gt") and filter_data.gt is not None:
             query_builder = query_builder.where_gt(column, filter_data.gt)
-
         if hasattr(filter_data, "gte") and filter_data.gte is not None:
             query_builder = query_builder.where_gte(column, filter_data.gte)
-
         if hasattr(filter_data, "lt") and filter_data.lt is not None:
             query_builder = query_builder.where_lt(column, filter_data.lt)
-
         if hasattr(filter_data, "lte") and filter_data.lte is not None:
             query_builder = query_builder.where_lte(column, filter_data.lte)
-
         if hasattr(filter_data, "between") and filter_data.between is not None:
             start, end = filter_data.between
             query_builder = query_builder.where_between(column, start, end)
-
         # Обработка алиасов from_ и to для BaseDateTimeFilter
         if hasattr(filter_data, "from_") and filter_data.from_ is not None:
             query_builder = query_builder.where_gte(column, filter_data.from_)
-
         if hasattr(filter_data, "to") and filter_data.to is not None:
             query_builder = query_builder.where_lte(column, filter_data.to)
-
         return query_builder
 
     @staticmethod
     def _apply_string_ops(
         query_builder: SupportsFiltering, column: Any, filter_data: StringFilter
     ) -> SupportsFiltering:
-        """Применить строковые операции (like, ilike, contains, etc.)"""
+        """
+        Применить строковые операции фильтрации
+
+        Применяет операции: like, ilike, contains, icontains, starts_with, ends_with.
+        Автоматически добавляет символы % для паттернов LIKE.
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            column: Колонка модели для фильтрации
+            filter_data: Экземпляр строкового фильтра
+
+        Returns:
+            Query builder с примененными строковыми операциями
+        """
         if filter_data.like is not None:
             query_builder = query_builder.where_like(column, filter_data.like)
-
         if filter_data.ilike is not None:
             query_builder = query_builder.where_ilike(column, filter_data.ilike)
-
         if filter_data.contains is not None:
             query_builder = query_builder.where_like(
                 column, f"%{filter_data.contains}%"
             )
-
         if filter_data.icontains is not None:
             query_builder = query_builder.where_ilike(
                 column, f"%{filter_data.icontains}%"
             )
-
         if filter_data.starts_with is not None:
             query_builder = query_builder.where_like(
                 column, f"{filter_data.starts_with}%"
             )
-
         if filter_data.ends_with is not None:
             query_builder = query_builder.where_like(
                 column, f"%{filter_data.ends_with}"
             )
-
         return query_builder
 
     def apply_string_filter(
         self, query_builder: SupportsFiltering, column: Any, filter_data: StringFilter
     ) -> SupportsFiltering:
-        """Применить строковый фильтр"""
+        """
+        Применить строковый фильтр
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            column: Колонка модели для фильтрации
+            filter_data: Экземпляр StringFilter
+
+        Returns:
+            Query builder с примененным строковым фильтром
+        """
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         query_builder = self._apply_string_ops(query_builder, column, filter_data)
         return query_builder
@@ -178,7 +256,19 @@ class FilterApplier:
         column: Any,
         filter_data: BaseNumberFilter,
     ) -> SupportsFiltering:
-        """Применить базовый числовой фильтр (работает для Int, Float, Decimal)"""
+        """
+        Применить базовый числовой фильтр
+
+        Работает для IntFilter, FloatFilter, DecimalFilter и BaseNumberFilter.
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            column: Колонка модели для фильтрации
+            filter_data: Экземпляр числового фильтра
+
+        Returns:
+            Query builder с примененным числовым фильтром
+        """
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         query_builder = self._apply_comparison_ops(query_builder, column, filter_data)
         return query_builder
@@ -189,7 +279,20 @@ class FilterApplier:
         column: Any,
         filter_data: BaseDateTimeFilter,
     ) -> SupportsFiltering:
-        """Применить базовый фильтр даты/времени (работает для DateTime, Date, Time, Timestamp)"""
+        """
+        Применить базовый фильтр даты/времени
+
+        Работает для DateTimeFilter, DateFilter, TimeFilter, TimestampFilter
+        и BaseDateTimeFilter.
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            column: Колонка модели для фильтрации
+            filter_data: Экземпляр фильтра даты/времени
+
+        Returns:
+            Query builder с примененным фильтром даты/времени
+        """
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         query_builder = self._apply_comparison_ops(query_builder, column, filter_data)
         return query_builder
@@ -197,21 +300,51 @@ class FilterApplier:
     def apply_boolean_filter(
         self, query_builder: SupportsFiltering, column: Any, filter_data: BooleanFilter
     ) -> SupportsFiltering:
-        """Применить булевый фильтр"""
+        """
+        Применить булевый фильтр
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            column: Колонка модели для фильтрации
+            filter_data: Экземпляр BooleanFilter
+
+        Returns:
+            Query builder с примененным булевым фильтром
+        """
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         return query_builder
 
     def apply_enum_filter(
         self, query_builder: SupportsFiltering, column: Any, filter_data: EnumFilter
     ) -> SupportsFiltering:
-        """Применить enum фильтр"""
+        """
+        Применить enum фильтр
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            column: Колонка модели для фильтрации
+            filter_data: Экземпляр EnumFilter
+
+        Returns:
+            Query builder с примененным enum фильтром
+        """
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         return query_builder
 
     def apply_uuid_filter(
         self, query_builder: SupportsFiltering, column: Any, filter_data: UUIDFilter
     ) -> SupportsFiltering:
-        """Применить UUID фильтр"""
+        """
+        Применить UUID фильтр
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            column: Колонка модели для фильтрации
+            filter_data: Экземпляр UUIDFilter
+
+        Returns:
+            Query builder с примененным UUID фильтром
+        """
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         return query_builder
 
@@ -222,8 +355,11 @@ class FilterApplier:
         filterable_fields: DPFilters,
     ) -> SupportsFiltering:
         """
-        Применить все фильтры из схемы FilterableFields автоматически.
-        Принимает только экземпляры фильтров (StringFilter, IntFilter и т.д.)
+        Применить все фильтры из схемы автоматически
+
+        Извлекает активные фильтры из DPFilters и применяет их к query builder.
+        Автоматически определяет тип каждого фильтра и применяет соответствующий метод.
+        Пропускает поля, отсутствующие в модели.
 
         Args:
             query_builder: Query builder для применения фильтров
@@ -232,6 +368,21 @@ class FilterApplier:
 
         Returns:
             Query builder с примененными фильтрами
+
+        Examples:
+            >>> from dplex.services.filters import StringFilter, IntFilter
+            >>> from dplex.services.dp_filters import DPFilters
+            >>>
+            >>> class UserFilters(DPFilters):
+            ...     name: StringFilter | None = None
+            ...     age: IntFilter | None = None
+            >>>
+            >>> filters = UserFilters(
+            ...     name=StringFilter(icontains="john"),
+            ...     age=IntFilter(gte=18)
+            ... )
+            >>> applier = FilterApplier()
+            >>> query = applier.apply_filters_from_schema(query_builder, User, filters)
         """
         # Получаем активные фильтры как словарь {field_name: filter_instance}
         fields_dict = filterable_fields.get_active_filters()
@@ -252,29 +403,24 @@ class FilterApplier:
                 query_builder = self.apply_string_filter(
                     query_builder, column, field_value
                 )
-
             elif isinstance(field_value, BooleanFilter):
                 query_builder = self.apply_boolean_filter(
                     query_builder, column, field_value
                 )
-
             elif isinstance(field_value, UUIDFilter):
                 query_builder = self.apply_uuid_filter(
                     query_builder, column, field_value
                 )
-
             elif isinstance(field_value, (IntFilter, FloatFilter, DecimalFilter)):
                 query_builder = self.apply_base_number_filter(
                     query_builder, column, field_value
                 )
-
             elif isinstance(
                 field_value, (DateTimeFilter, DateFilter, TimeFilter, TimestampFilter)
             ):
                 query_builder = self.apply_base_datetime_filter(
                     query_builder, column, field_value
                 )
-
             elif isinstance(field_value, EnumFilter):
                 query_builder = self.apply_enum_filter(
                     query_builder, column, field_value
@@ -292,10 +438,12 @@ class FilterApplier:
         """
         Применить фильтр определенного типа к query builder
 
+        Создает экземпляр фильтра из словаря и применяет соответствующий метод.
+
         Args:
             query_builder: Query builder для применения фильтров
             column: Колонка модели для фильтрации
-            filter_type: Тип фильтра (StringFilter, NumberFilter, etc.)
+            filter_type: Тип фильтра (StringFilter, IntFilter и т.д.)
             field_value: Словарь со значениями фильтра
 
         Returns:
@@ -305,19 +453,15 @@ class FilterApplier:
         filter_instance = filter_type(**field_value)
 
         # Применяем соответствующий метод в зависимости от типа фильтра
-
         # Строковые фильтры
         if filter_type == StringFilter:
             return self.apply_string_filter(query_builder, column, filter_instance)
-
         # Булевые фильтры
         elif filter_type == BooleanFilter:
             return self.apply_boolean_filter(query_builder, column, filter_instance)
-
         # Числовые фильтры (используем базовый метод для всех)
         elif filter_type in (IntFilter, FloatFilter, DecimalFilter, BaseNumberFilter):
             return self.apply_base_number_filter(query_builder, column, filter_instance)
-
         # Фильтры даты/времени (используем базовый метод для всех)
         elif filter_type in (
             DateTimeFilter,
@@ -329,11 +473,9 @@ class FilterApplier:
             return self.apply_base_datetime_filter(
                 query_builder, column, filter_instance
             )
-
         # Enum фильтры
         elif filter_type == EnumFilter:
             return self.apply_enum_filter(query_builder, column, filter_instance)
-
         # UUID фильтры
         elif filter_type == UUIDFilter:
             return self.apply_uuid_filter(query_builder, column, filter_instance)
@@ -346,14 +488,22 @@ class FilterApplier:
         """
         Определить тип фильтра по структуре данных
 
+        Анализирует ключи и значения словаря для определения
+        подходящего типа фильтра.
+
         Args:
             field_value: Словарь со значениями фильтра
 
         Returns:
             Класс фильтра или None, если не удалось определить
+
+        Notes:
+            Приоритет определения:
+            1. Строковые операции (contains, icontains и т.д.)
+            2. Операции сравнения (gt, gte, lt, lte, between)
+            3. Базовые операции (eq, ne, in_, not_in) - по типу значения
         """
         # Проверяем наличие специфичных операций для определения типа
-
         # Если есть строковые операции - это StringFilter
         if any(key in field_value for key in self._STRING_OPS):
             return StringFilter
@@ -368,7 +518,6 @@ class FilterApplier:
             for key in ["eq", "ne"]:
                 if key in field_value and field_value[key] is not None:
                     return self._detect_filter_type_by_value(field_value[key])
-
             for key in ["in_", "not_in"]:
                 if (
                     key in field_value
@@ -386,19 +535,30 @@ class FilterApplier:
         field_value: dict[str, Any],
     ) -> type[FilterType]:
         """
-        Определить тип фильтра для операций сравнения (gt, gte, lt, lte, between, from_, to)
+        Определить тип фильтра для операций сравнения
+
+        Анализирует значения операций gt, gte, lt, lte, between, from_, to
+        для определения конкретного типа фильтра.
 
         Args:
             field_value: Словарь со значениями фильтра
 
         Returns:
             Соответствующий класс фильтра
+
+        Notes:
+            Порядок проверки типов:
+            1. datetime.datetime → DateTimeFilter
+            2. datetime.date → DateFilter
+            3. datetime.time → TimeFilter
+            4. Decimal → DecimalFilter
+            5. float → FloatFilter
+            6. int → IntFilter или TimestampFilter (если есть from_/to)
         """
         # Проверяем значения операций сравнения
         for key in ["gt", "gte", "lt", "lte", "from_", "to"]:
             if key in field_value and field_value[key] is not None:
                 value = field_value[key]
-
                 # Проверяем тип значения
                 if isinstance(value, datetime.datetime):
                     return DateTimeFilter
@@ -422,7 +582,6 @@ class FilterApplier:
             value = field_value["between"]
             if isinstance(value, (tuple, list)) and len(value) > 0:
                 first_val = value[0]
-
                 if isinstance(first_val, datetime.datetime):
                     return DateTimeFilter
                 elif isinstance(first_val, datetime.date):
@@ -446,49 +605,48 @@ class FilterApplier:
         """
         Определить тип фильтра по значению
 
+        Проверяет тип значения для определения подходящего класса фильтра.
+
         Args:
             value: Значение для определения типа
 
         Returns:
-            Класс фильтра или None
+            Класс фильтра или None если тип не распознан
+
+        Notes:
+            ВАЖНО: порядок проверок имеет значение!
+            - bool проверяется до int (bool является подклассом int)
+            - datetime проверяется до date (datetime является подклассом date)
+            - Decimal проверяется до float/int
         """
         # Важно: порядок проверок имеет значение!
         # bool является подклассом int, поэтому проверяем его первым
         if isinstance(value, bool):
             return BooleanFilter
-
         # Проверяем Enum
         elif isinstance(value, Enum):
             return EnumFilter
-
         # Проверяем UUID
         elif isinstance(value, UUID):
             return UUIDFilter
-
         # Проверяем datetime (до date, т.к. datetime - подкласс date)
         elif isinstance(value, datetime.datetime):
             return DateTimeFilter
-
         # Проверяем date
         elif isinstance(value, datetime.date):
             return DateFilter
-
         # Проверяем time
         elif isinstance(value, datetime.time):
             return TimeFilter
-
         # Проверяем Decimal (до float/int)
         elif isinstance(value, Decimal):
             return DecimalFilter
-
         # Проверяем float (до int, т.к. порядок важен)
         elif isinstance(value, float):
             return FloatFilter
-
         # Проверяем int
         elif isinstance(value, int):
             return IntFilter
-
         # Проверяем str
         elif isinstance(value, str):
             return StringFilter
