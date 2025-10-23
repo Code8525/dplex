@@ -2,19 +2,16 @@
 
 import uuid
 from typing import Any, Generic
-
 from sqlalchemy import ColumnElement, and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
-
-from dplex.repositories.query_builder import QueryBuilder
+from dplex.query_builder import QueryBuilder
 from dplex.types import KeyType, ModelType
 
 
 class DPRepo(Generic[ModelType, KeyType]):
     """
     Базовый репозиторий для работы с SQLAlchemy моделями
-
     Предоставляет стандартные CRUD операции и интеграцию с QueryBuilder
     для построения сложных запросов. Поддерживает различные типы первичных ключей.
 
@@ -71,12 +68,15 @@ class DPRepo(Generic[ModelType, KeyType]):
             raise ValueError(
                 f"Model {self.model.__name__} does not have field '{self.id_field_name}'"
             )
+
         column = getattr(self.model, self.id_field_name)
+
         # Проверяем что это SQLAlchemy column
         if not hasattr(column, "property"):
             raise ValueError(
                 f"Field '{self.id_field_name}' in {self.model.__name__} is not a SQLAlchemy column"
             )
+
         return column
 
     def query(self) -> "QueryBuilder[ModelType]":
@@ -133,7 +133,13 @@ class DPRepo(Generic[ModelType, KeyType]):
 
         Returns:
             Список найденных моделей
+
+        Raises:
+            ValueError: Если список ID пустой
         """
+        if not entity_ids:
+            raise ValueError("DPRepo.find_by_ids: Список ID не может быть пустым")
+
         return await self.query().where(self.id_in(entity_ids)).find_all()
 
     async def delete_by_query_builder(
@@ -142,7 +148,6 @@ class DPRepo(Generic[ModelType, KeyType]):
     ) -> None:
         """
         Массовое удаление по условиям из QueryBuilder
-
         Использует централизованную логику построения WHERE.
 
         Args:
@@ -159,6 +164,7 @@ class DPRepo(Generic[ModelType, KeyType]):
             raise ValueError(
                 "DPRepo.delete_by_query_builder: требуется хотя бы одно условие WHERE для массового удаления"
             )
+
         stmt = delete(self.model).where(condition)
         await self.session.execute(stmt)
 
@@ -184,7 +190,13 @@ class DPRepo(Generic[ModelType, KeyType]):
 
         Returns:
             None
+
+        Raises:
+            ValueError: Если список ID пустой
         """
+        if not entity_ids:
+            raise ValueError("DPRepo.delete_by_ids: Список ID не может быть пустым")
+
         stmt = delete(self.model).where(self.id_in(entity_ids))
         await self.session.execute(stmt)
 
@@ -204,10 +216,12 @@ class DPRepo(Generic[ModelType, KeyType]):
             None
 
         Raises:
-            ValueError: Если where равен None или пустой список
+            ValueError: Если where равен None, пустой список или values пустой
         """
         if not values:
-            return None
+            raise ValueError(
+                "DPRepo.update: Данные для обновления не могут быть пустыми"
+            )
 
         if where is None:
             raise ValueError("DPRepo.update: пустой WHERE запрещён")
@@ -239,10 +253,12 @@ class DPRepo(Generic[ModelType, KeyType]):
             None
 
         Raises:
-            ValueError: Если не указано ни одного условия WHERE
+            ValueError: Если не указано ни одного условия WHERE или values пустой
         """
         if not values:
-            return None
+            raise ValueError(
+                "DPRepo.update_by_query_builder: Данные для обновления не могут быть пустыми"
+            )
 
         condition = self._build_where_clause_from_builder(query_builder)
         if condition is None:
@@ -263,7 +279,15 @@ class DPRepo(Generic[ModelType, KeyType]):
 
         Returns:
             None
+
+        Raises:
+            ValueError: Если values пустой
         """
+        if not values:
+            raise ValueError(
+                "DPRepo.update_by_id: Данные для обновления не могут быть пустыми"
+            )
+
         stmt = update(self.model).where(self.id_eq(entity_id)).values(**values)
         await self.session.execute(stmt)
 
@@ -279,7 +303,18 @@ class DPRepo(Generic[ModelType, KeyType]):
 
         Returns:
             None
+
+        Raises:
+            ValueError: Если entity_ids или values пустые
         """
+        if not entity_ids:
+            raise ValueError("DPRepo.update_by_ids: Список ID не может быть пустым")
+
+        if not values:
+            raise ValueError(
+                "DPRepo.update_by_ids: Данные для обновления не могут быть пустыми"
+            )
+
         stmt = update(self.model).where(self.id_in(entity_ids)).values(**values)
         await self.session.execute(stmt)
 
@@ -299,7 +334,6 @@ class DPRepo(Generic[ModelType, KeyType]):
     async def create(self, entity: ModelType) -> ModelType:
         """
         Создать новую сущность
-
         Добавляет сущность в сессию. Требует вызов commit() для сохранения.
 
         Args:
@@ -314,7 +348,6 @@ class DPRepo(Generic[ModelType, KeyType]):
     async def create_bulk(self, entities: list[ModelType]) -> list[ModelType]:
         """
         Создать несколько сущностей
-
         Добавляет сущности в сессию. Требует вызов commit() для сохранения.
 
         Args:
@@ -322,14 +355,21 @@ class DPRepo(Generic[ModelType, KeyType]):
 
         Returns:
             Список созданных экземпляров модели
+
+        Raises:
+            ValueError: Если список entities пустой
         """
+        if not entities:
+            raise ValueError(
+                "DPRepo.create_bulk: Список для создания не может быть пустым"
+            )
+
         self.session.add_all(entities)
         return entities
 
     async def commit(self) -> None:
         """
         Сохранить изменения в базе данных
-
         Фиксирует все изменения в текущей транзакции.
 
         Returns:
@@ -340,7 +380,6 @@ class DPRepo(Generic[ModelType, KeyType]):
     async def rollback(self) -> None:
         """
         Откатить изменения
-
         Отменяет все изменения в текущей транзакции.
 
         Returns:
@@ -370,7 +409,6 @@ class DPRepo(Generic[ModelType, KeyType]):
     ) -> list[ModelType]:
         """
         Выполнить типизированный запрос из QueryBuilder
-
         Применяет все условия фильтрации, сортировки и пагинации из builder.
 
         Args:
@@ -400,7 +438,6 @@ class DPRepo(Generic[ModelType, KeyType]):
     async def execute_typed_count(self, builder: "QueryBuilder[ModelType]") -> int:
         """
         Подсчитать записи через типизированный QueryBuilder
-
         Применяет только условия фильтрации из builder.
 
         Args:

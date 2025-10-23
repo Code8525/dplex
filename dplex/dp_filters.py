@@ -4,8 +4,7 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dplex.services.filters import StringFilter
-from dplex.services.sort import Sort
+from dplex import Sort
 
 # Generic тип для поля сортировки
 SortFieldType = TypeVar("SortFieldType")
@@ -28,10 +27,12 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         offset: Количество записей для пропуска (от 0 и выше)
 
     Examples:
+
+        >>> from dplex import StringFilter
         >>> from enum import StrEnum
-        >>> from dplex.services import DPFilters
-        >>> from dplex.services.filters import StringFilter, IntFilter
-        >>>
+        >>> from dplex import IntFilter
+
+
         >>> class UserSortField(StrEnum):
         ...     NAME = "name"
         ...     EMAIL = "email"
@@ -50,19 +51,7 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         ...     limit=10,
         ...     offset=0
         ... )
-        >>>
-        >>> # Создание с сортировкой
-        >>> filters = UserFilterableFields(
-        ...     sort=Sort(by=UserSortField.NAME, order=Order.DESC)
-        ... )
-        >>>
-        >>> # Множественная сортировка
-        >>> filters = UserFilterableFields(
-        ...     sort=[
-        ...         Sort(by=UserSortField.AGE, order=Order.DESC),
-        ...         Sort(by=UserSortField.NAME, order=Order.ASC)
-        ...     ]
-        ... )
+
 
     Note:
         - Все поля фильтров должны быть опциональными (| None)
@@ -102,14 +91,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         Returns:
             Словарь {field_name: filter_instance} с активными фильтрами
 
-        Examples:
-            >>> filters = UserFilterableFields(
-            ...     name=StringFilter(eq="John"),
-            ...     age=IntFilter(gte=18),
-            ...     email=None
-            ... )
-            >>> filters.get_active_filters()
-            {'name': StringFilter(eq='John'), 'age': IntFilter(gte=18)}
         """
         special_fields = {"sort", "limit", "offset"}
         result: dict[str, Any] = {}
@@ -133,14 +114,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         Returns:
             True если есть хотя бы один активный фильтр, иначе False
 
-        Examples:
-            >>> filters = UserFilterableFields()
-            >>> filters.has_filters()
-            False
-            >>>
-            >>> filters = UserFilterableFields(name=StringFilter(eq="John"))
-            >>> filters.has_filters()
-            True
         """
         return len(self.get_active_filters()) > 0
 
@@ -151,13 +124,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         Returns:
             Список имен полей с активными фильтрами
 
-        Examples:
-            >>> filters = UserFilterableFields(
-            ...     name=StringFilter(eq="John"),
-            ...     age=IntFilter(gte=18)
-            ... )
-            >>> filters.get_filter_fields()
-            ['name', 'age']
         """
         return list(self.get_active_filters().keys())
 
@@ -167,14 +133,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
 
         Returns:
             Количество активных фильтров
-
-        Examples:
-            >>> filters = UserFilterableFields(
-            ...     name=StringFilter(eq="John"),
-            ...     age=IntFilter(gte=18)
-            ... )
-            >>> filters.get_filter_count()
-            2
         """
         return len(self.get_active_filters())
 
@@ -187,13 +145,7 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         Returns:
             None
 
-        Examples:
-            >>> filters = UserFilterableFields(name=StringFilter(eq="John"))
-            >>> filters.has_filters()
-            True
-            >>> filters.clear_filters()
-            >>> filters.has_filters()
-            False
+
 
         Note:
             Работает только если frozen=False в model_config.
@@ -216,13 +168,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         Returns:
             Словарь {имя_поля: количество_операций}
 
-        Examples:
-            >>> filters = UserFilterableFields(
-            ...     name=StringFilter(eq="John", icontains="Doe"),
-            ...     age=IntFilter(gte=18, lte=65)
-            ... )
-            >>> filters.get_filter_summary()
-            {'name': 2, 'age': 2}
         """
         summary: dict[str, int] = {}
         active_filters = self.get_active_filters()
@@ -244,15 +189,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
 
         Returns:
             Словарь с ключами 'limit' и 'offset'
-
-        Examples:
-            >>> filters = UserFilterableFields(limit=10, offset=20)
-            >>> filters.get_pagination_info()
-            {'limit': 10, 'offset': 20}
-            >>>
-            >>> filters = UserFilterableFields()
-            >>> filters.get_pagination_info()
-            {'limit': None, 'offset': None}
         """
         return {"limit": self.limit, "offset": self.offset}
 
@@ -262,15 +198,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
 
         Returns:
             True если установлен хотя бы один параметр пагинации (limit или offset)
-
-        Examples:
-            >>> filters = UserFilterableFields(limit=10)
-            >>> filters.has_pagination()
-            True
-            >>>
-            >>> filters = UserFilterableFields()
-            >>> filters.has_pagination()
-            False
         """
         return self.limit is not None or self.offset is not None
 
@@ -280,15 +207,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
 
         Returns:
             True если установлена сортировка, иначе False
-
-        Examples:
-            >>> filters = UserFilterableFields(sort=Sort(by=UserSortField.NAME))
-            >>> filters.has_sort()
-            True
-            >>>
-            >>> filters = UserFilterableFields()
-            >>> filters.has_sort()
-            False
         """
         return self.sort is not None
 
@@ -303,15 +221,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
 
         Returns:
             Строка с информацией о классе и активных параметрах
-
-        Examples:
-            >>> filters = UserFilterableFields(
-            ...     name=StringFilter(eq="John"),
-            ...     age=IntFilter(gte=18),
-            ...     limit=10
-            ... )
-            >>> repr(filters)
-            "UserFilterableFields(filters=[name, age], limit=10)"
         """
         active = self.get_filter_fields()
         parts = []
@@ -346,20 +255,6 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
 
         Returns:
             Строка с человекочитаемым описанием состояния фильтров
-
-        Examples:
-            >>> filters = UserFilterableFields(
-            ...     name=StringFilter(eq="John"),
-            ...     age=IntFilter(gte=18),
-            ...     sort=Sort(by=UserSortField.NAME),
-            ...     limit=10
-            ... )
-            >>> str(filters)
-            "UserFilterableFields: 2 active filters, 1 sort rule(s), pagination(limit=10)"
-            >>>
-            >>> filters = UserFilterableFields()
-            >>> str(filters)
-            "UserFilterableFields: No active filters"
         """
         count = self.get_filter_count()
         parts = []

@@ -7,9 +7,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 from sqlalchemy.orm import DeclarativeBase
 
-from dplex.services.filters import (
-    BaseDateTimeFilter,
-    BaseNumberFilter,
+from dplex import (
     BooleanFilter,
     DateFilter,
     DateTimeFilter,
@@ -95,8 +93,6 @@ FilterType = (
     | IntFilter
     | FloatFilter
     | DecimalFilter
-    | BaseNumberFilter
-    | BaseDateTimeFilter
     | DateTimeFilter
     | DateFilter
     | TimeFilter
@@ -116,7 +112,6 @@ Union тип всех доступных фильтров
     - IntFilter: Фильтрация целых чисел
     - FloatFilter: Фильтрация чисел с плавающей точкой
     - DecimalFilter: Фильтрация точных десятичных чисел
-    - BaseNumberFilter: Базовый числовой фильтр
     - DateTimeFilter: Фильтрация даты и времени
     - DateFilter: Фильтрация только дат
     - TimeFilter: Фильтрация только времени

@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Any, Protocol
 from uuid import UUID
 
-from dplex.services.dp_filters import DPFilters
+from dplex.dp_filters import DPFilters
 from dplex.services.filters import (
     BaseDateTimeFilter,
     BaseNumberFilter,

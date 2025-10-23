@@ -9,7 +9,7 @@ from dplex.services.sort import NullsPlacement, Order, Sort
 from dplex.types import ModelType
 
 if TYPE_CHECKING:
-    from dplex.repositories.dp_repo import DPRepo
+    from dplex.dp_repo import DPRepo
 
 
 class QueryBuilder(Generic[ModelType]):

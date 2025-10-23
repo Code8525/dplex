@@ -14,11 +14,9 @@ from sqlalchemy import String, Integer
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 
-from dplex.repositories.dp_repo import DPRepo
-from dplex.services.dp_filters import DPFilters
-from dplex.services.dp_service import DPService
-from dplex.services.filters import StringFilter, IntFilter, DateTimeFilter
-from dplex.services.sort import Sort, Order
+from dplex.dp_repo import DPRepo
+from dplex.dp_filters import DPFilters
+from dplex.filters import StringFilter, IntFilter, DateTimeFilter
 
 
 # ==================== МОДЕЛИ И СХЕМЫ ====================

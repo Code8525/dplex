@@ -2,11 +2,11 @@
 dplex - Enterprise-grade data layer framework for Python
 """
 
-from dplex.repositories.dp_repo import DPRepo
-from dplex.services.dp_service import DPService
-from dplex.services.dp_filters import DPFilters
-from dplex.services.sort import Sort, Order, NullsPlacement
-from dplex.services.filters import (
+from dplex.dp_repo import DPRepo
+from dplex.dp_filters import DPFilters
+from dplex.dp_service import DPService
+
+from dplex.filters import (
     StringFilter,
     IntFilter,
     FloatFilter,
@@ -19,6 +19,8 @@ from dplex.services.filters import (
     EnumFilter,
     UUIDFilter,
 )
+from dplex.sort import Sort, Order, NullsPlacement
+
 
 __version__ = "0.1.0"
 
