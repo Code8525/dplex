@@ -14,6 +14,7 @@ from sqlalchemy import String, Integer
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 
+from dplex import DPService, Sort, Order
 from dplex.dp_repo import DPRepo
 from dplex.dp_filters import DPFilters
 from dplex.filters import StringFilter, IntFilter, DateTimeFilter

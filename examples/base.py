@@ -1,11 +1,8 @@
-# Python 3.11+, SQLAlchemy 2.0 (async), Pydantic v2
-
 from __future__ import annotations
 import uuid
 from datetime import datetime
 
 from enum import StrEnum
-from typing import Annotated
 
 from pydantic import BaseModel, Field
 from sqlalchemy import String, DateTime
