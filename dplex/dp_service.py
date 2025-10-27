@@ -92,7 +92,7 @@ class DPService(
             Новый экземпляр SQLAlchemy модели
         """
         if isinstance(schema, BaseModel):
-            data = schema.model_dump(exclude_none=True)
+            data = schema.model_dump(exclude_unset=True)
         else:
             data = schema.__dict__
         return self.repository.model(**data)

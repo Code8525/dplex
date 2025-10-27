@@ -8,19 +8,18 @@ from pydantic import BaseModel
 from sqlalchemy.orm import DeclarativeBase
 
 from dplex import (
-    BooleanFilter,
-    DateFilter,
-    DateTimeFilter,
-    DecimalFilter,
-    EnumFilter,
-    FloatFilter,
-    IntFilter,
     StringFilter,
+    IntFilter,
+    FloatFilter,
+    DecimalFilter,
+    DateTimeFilter,
+    DateFilter,
     TimeFilter,
     TimestampFilter,
+    BooleanFilter,
+    EnumFilter,
     UUIDFilter,
 )
-
 
 ModelType = TypeVar("ModelType", bound=DeclarativeBase)
 """

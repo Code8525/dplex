@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING, Any, Generic
 from sqlalchemy import ColumnElement, asc, desc, nullsfirst, nullslast
 from sqlalchemy.orm import InstrumentedAttribute
 
-from dplex.services.sort import NullsPlacement, Order, Sort
 from dplex.types import ModelType
 
 if TYPE_CHECKING:
     from dplex.dp_repo import DPRepo
+    from dplex import NullsPlacement, Sort, Order
 
 
 class QueryBuilder(Generic[ModelType]):
