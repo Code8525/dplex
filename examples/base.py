@@ -1,20 +1,19 @@
 from __future__ import annotations
+
+import asyncio
 import uuid
 from datetime import datetime
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import String, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from dplex import DPFilters, DPRepo, DPService
 from dplex.internal.filters import UUIDFilter, StringFilter, DateTimeFilter
 from dplex.internal.sort import Sort, Order, NullsPlacement
-
-
-# === dplex базис (у вас уже есть) ===
 
 
 # ===================== 1) Модель =====================
@@ -24,13 +23,10 @@ class Base(DeclarativeBase): ...
 class User(Base):
     __tablename__ = "users"
 
-    # ⚠️ Имя колонки совпадает с enum-значением сортировки (см. ниже)
     user_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), unique=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(insert_default=datetime.now)
 
 
 # ===================== 2) Pydantic-схемы =====================
@@ -46,15 +42,16 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: uuid.UUID
     name: str
     email: str | None
-    created_at: datetime
+    created_at: datetime | None
 
 
 # ===================== 3) Сортировка и фильтры =====================
 class UserSortField(StrEnum):
-    # Значения должны совпадать с ИМЕНАМИ колонок модели
     NAME = "name"
     CREATED_AT = "created_at"
 
@@ -117,43 +114,113 @@ class UserService(
         super().__init__(repository=repo, session=session, response_schema=UserResponse)
 
 
+async def init_database(engine) -> None:
+    """Создать все таблицы в БД"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("✓ База данных инициализирована")
+
+
 # ===================== 6) Пример использования =====================
-# Пример асинхронного CRUD-потока
+# Пример асинхронного CRUD-потока с явной сортировкой
 async def example_flow(session: AsyncSession) -> None:
     repo = UserRepo(session)
     service = UserService(repo, session)
 
-    # ---- Create
-    u = await service.create(UserCreate(name="Иван", email="ivan@example.com"))
-    print("Created:", u)
+    # ---- Create: создадим больше пользователей с разными email (в т.ч. @mail.ru)
+    await service.create(UserCreate(name="Иван", email="ivan@example.com"))
+    await service.create(UserCreate(name="Анна", email="anna@example.com"))
+    await service.create(UserCreate(name="Борис", email="boris@mail.ru"))
+    await service.create(UserCreate(name="Вера", email=None))
+    await service.create(UserCreate(name="Григорий", email="grigoriy@mail.ru"))
+    u = await service.create(
+        UserCreate(name="Денис", email="denis@mail.com")
+    )  # возьмём как 'u' для дальнейших операций
+    print("✓ Users created")
 
-    # ---- Read (list с фильтрами + сортировкой + пагинацией)
-    filters = UserFilters(
-        email=StringFilter(ends_with="@mail.ru"),
-        sort=[  # можно список Sort(...) для multi-sort
-            Sort(
-                by=UserSortField.CREATED_AT, order=Order.DESC, nulls=NullsPlacement.LAST
-            ),
-            Sort(by=UserSortField.NAME, order=Order.ASC),
-        ],
-        limit=50,
-        offset=0,
-        user_id=UUIDFilter(eq=u.user_id),
+    # ---- Read #1: ЯВНАЯ сортировка по ИМЕНИ (ASC), затем по ДАТЕ СОЗДАНИЯ (DESC, nulls last)
+    users_by_name_then_created = await service.get_all(
+        UserFilters(
+            sort=[
+                Sort(by=UserSortField.NAME, order=Order.ASC),  # 1-й ключ: name ASC
+                Sort(
+                    by=UserSortField.CREATED_AT,
+                    order=Order.DESC,
+                    nulls=NullsPlacement.LAST,
+                ),  # 2-й ключ: created_at DESC NULLS LAST
+            ],
+            limit=50,
+            offset=0,
+        )
     )
-    users = await service.get_all(filters)
-    print("Found:", users)
+    print("\nSorted by NAME ASC, then CREATED_AT DESC (NULLS LAST):")
+    for it in users_by_name_then_created:
+        print(f"  {it.name:10s} | {it.email or '-':20s} | {it.created_at}")
 
-    # ---- Update (обнуление email через специальный маркер NULL)
-    u2 = await service.update_by_id(
-        u.user_id, UserUpdate(email=None)  # ← это поставит email IS NULL в БД
+    # ---- Read #2: Фильтр только @mail.ru + ЯВНАЯ сортировка по ДАТЕ (DESC NULLS LAST), затем по ИМЕНИ (ASC)
+    only_mail_ru = await service.get_all(
+        UserFilters(
+            email=StringFilter(ends_with="@mail.ru"),
+            sort=[
+                Sort(
+                    by=UserSortField.CREATED_AT,
+                    order=Order.DESC,
+                    nulls=NullsPlacement.LAST,
+                ),
+                Sort(by=UserSortField.NAME, order=Order.ASC),
+            ],
+            limit=50,
+            offset=0,
+        )
     )
-    print("Updated:", u2)
+    print("\n@mail.ru ONLY — sorted by CREATED_AT DESC (NULLS LAST), then NAME ASC:")
+    for it in only_mail_ru:
+        print(f"  {it.name:10s} | {it.email or '-':20s} | {it.created_at}")
+
+    # ---- Update: обнулим email у пользователя 'u' (NULL в БД)
+    await service.update_by_id(u.user_id, UserUpdate(email=None))
+
+    u2 = await service.get_by_id(u.user_id)
+
+    print(f"\nUpdated (email -> NULL): {u2.user_id} | {u2.name} | {u2.email}")
 
     # ---- Exists / Count
     exists = await service.exists(UserFilters(user_id=UUIDFilter(eq=u.user_id)))
     total = await service.count(UserFilters())
-    print("Exists?", exists, "Total:", total)
+    print("\nExists?", exists, "Total:", total)
 
     # ---- Delete
     deleted = await service.delete_by_id(u.user_id)
     print("Deleted?", deleted)
+
+    # ---- Контрольная выборка после удаления: снова по имени
+    after_delete = await service.get_all(
+        UserFilters(
+            sort=[Sort(by=UserSortField.NAME, order=Order.ASC)],
+            limit=50,
+            offset=0,
+        )
+    )
+    print("\nAfter delete — sorted by NAME ASC:")
+    for it in after_delete:
+        print(f"  {it.name:10s} | {it.email or '-':20s} | {it.created_at}")
+
+
+async def main() -> None:
+
+    # Создание движка и сессии
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+
+    # Инициализация БД
+    await init_database(engine)
+
+    # Создание фабрики сессий
+    async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with async_session_maker() as session:
+
+        await example_flow(session)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

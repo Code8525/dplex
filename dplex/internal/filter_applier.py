@@ -8,6 +8,9 @@ from uuid import UUID
 
 from dplex.dp_filters import DPFilters
 
+import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
+
 from dplex.internal.filters import (
     BaseDateTimeFilter,
     BaseNumberFilter,
@@ -329,8 +332,66 @@ class FilterApplier:
         Returns:
             Query builder с примененным enum фильтром
         """
-        query_builder = self._apply_common_ops(query_builder, column, filter_data)
-        return query_builder
+        filter_data = self._coerce_enum_filter_values(column, filter_data)
+        return self._apply_common_ops(query_builder, column, filter_data)
+
+    @staticmethod
+    def _get_sa_enum_type(column: InstrumentedAttribute | Any) -> sa.Enum | None:
+        col_type = getattr(column, "type", None)
+        return col_type if isinstance(col_type, sa.Enum) else None
+
+    @staticmethod
+    def _coerce_single_enum_value(sa_enum: sa.Enum, value: Any) -> Any:
+        enum_class = getattr(sa_enum, "enum_class", None)
+
+        if isinstance(value, Enum):
+            if enum_class and isinstance(value, enum_class):
+                return value
+            str_val = getattr(value, "value", str(value))
+            if not enum_class and sa_enum.enums and str_val in sa_enum.enums:
+                return str_val
+            raise ValueError(f"Enum value '{value}' is not compatible with column enum")
+
+        if isinstance(value, str):
+            if enum_class:
+                try:
+                    return enum_class(value)  # по .value
+                except Exception:
+                    try:
+                        return enum_class[value]  # по .name
+                    except Exception:
+                        pass
+                raise ValueError(
+                    f"Invalid enum literal '{value}' for {enum_class.__name__}"
+                )
+            if sa_enum.enums and value in sa_enum.enums:
+                return value
+            raise ValueError(f"Invalid enum literal '{value}' for DB enum")
+
+        raise ValueError(f"Unsupported enum filter value type: {type(value).__name__}")
+
+    @classmethod
+    def _coerce_enum_filter_values(cls, column: Any, filt: EnumFilter) -> EnumFilter:
+        sa_enum = cls._get_sa_enum_type(column)
+        if not sa_enum:
+            return filt
+
+        def map_list(lst):
+            return (
+                None
+                if lst is None
+                else [cls._coerce_single_enum_value(sa_enum, v) for v in lst]
+            )
+
+        if getattr(filt, "eq", None) is not None:
+            filt.eq = cls._coerce_single_enum_value(sa_enum, filt.eq)
+        if getattr(filt, "ne", None) is not None:
+            filt.ne = cls._coerce_single_enum_value(sa_enum, filt.ne)
+        if getattr(filt, "in_", None) is not None:
+            filt.in_ = map_list(filt.in_)
+        if getattr(filt, "not_in", None) is not None:
+            filt.not_in = map_list(filt.not_in)
+        return filt
 
     def apply_uuid_filter(
         self, query_builder: SupportsFiltering, column: Any, filter_data: UUIDFilter
