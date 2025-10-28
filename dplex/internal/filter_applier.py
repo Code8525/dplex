@@ -7,7 +7,8 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from dplex.dp_filters import DPFilters
-from dplex.services.filters import (
+
+from dplex.internal.filters import (
     BaseDateTimeFilter,
     BaseNumberFilter,
     BooleanFilter,
@@ -22,7 +23,7 @@ from dplex.services.filters import (
     TimestampFilter,
     UUIDFilter,
 )
-from dplex.types import FilterType
+from dplex.internal.types import FilterType
 
 
 class SupportsFiltering(Protocol):
@@ -85,8 +86,8 @@ class FilterApplier:
     всех фильтров из схемы DPFilters.
 
     Examples:
-        >>> from dplex.services.filter_applier import FilterApplier
-        >>> from dplex.services.filters import StringFilter, IntFilter
+        >>> from dplex.internal.filter_applier import FilterApplier
+        >>> from dplex import StringFilter, IntFilter
         >>>
         >>> applier = FilterApplier()
         >>>
@@ -370,8 +371,8 @@ class FilterApplier:
             Query builder с примененными фильтрами
 
         Examples:
-            >>> from dplex.services.filters import StringFilter, IntFilter
-            >>> from dplex.services.dp_filters import DPFilters
+            >>> from dplex.internal.filters import StringFilter, IntFilter
+            >>> from dplex.dp_filters import DPFilters
             >>>
             >>> class UserFilters(DPFilters):
             ...     name: StringFilter | None = None

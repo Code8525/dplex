@@ -5,8 +5,8 @@ from typing import Any, Generic
 from sqlalchemy import ColumnElement, and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
-from dplex.query_builder import QueryBuilder
-from dplex.types import KeyType, ModelType
+from dplex.internal.query_builder import QueryBuilder
+from dplex.internal.types import KeyType, ModelType
 
 
 class DPRepo(Generic[ModelType, KeyType]):

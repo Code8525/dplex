@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import String, DateTime
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -20,7 +20,6 @@ from dplex import (
     DPFilters,
     Sort,
     Order,
-    NullsPlacement,
     StringFilter,
     UUIDFilter,
     DateTimeFilter,
@@ -39,7 +38,10 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True),
+        nullable=False,
+        onupdate=datetime.now,
+        default=datetime.now,
     )
 
 
@@ -50,12 +52,13 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    # ❗ Поля НЕ Optional, но допускают None (для установки NULL)
     name: str | None = None
     email: str | None = None
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: uuid.UUID
     name: str
     email: str | None
@@ -143,7 +146,11 @@ async def main() -> None:
         print(all_users_after_bulk)
 
         print("\n=== DELETE ===")
+        after_delete = await service.get_all(UserFilters())
+        print(after_delete)
         await service.delete_by_id(u1.user_id)
+        after_delete = await service.get_all(UserFilters())
+        print(after_delete)
         await service.delete(UserFilters(name=StringFilter(eq="Bob")))
         after_delete = await service.get_all(UserFilters())
         print(after_delete)

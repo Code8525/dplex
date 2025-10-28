@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Generic
 
-from dplex.types import SortByType
+from dplex.internal.types import SortByType
 
 
 class Order(StrEnum):

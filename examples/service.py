@@ -17,7 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from dplex import DPService, Sort, Order
 from dplex.dp_repo import DPRepo
 from dplex.dp_filters import DPFilters
-from dplex.filters import StringFilter, IntFilter, DateTimeFilter
+from dplex.internal.filters import StringFilter, IntFilter, DateTimeFilter
 
 
 # ==================== МОДЕЛИ И СХЕМЫ ====================

@@ -4,7 +4,8 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dplex import Sort
+
+from dplex.internal.sort import Sort
 
 # Generic тип для поля сортировки
 SortFieldType = TypeVar("SortFieldType")

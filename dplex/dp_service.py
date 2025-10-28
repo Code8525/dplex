@@ -4,9 +4,8 @@ from typing import Any, Generic
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dplex import DPRepo, DPFilters, Sort, Order
-from dplex.filter_applier import FilterApplier
-from dplex.types import (
+from dplex.internal.filter_applier import FilterApplier
+from dplex.internal.types import (
     ModelType,
     KeyType,
     CreateSchemaType,
@@ -15,6 +14,10 @@ from dplex.types import (
     FilterSchemaType,
     SortFieldSchemaType,
 )
+
+from dplex.dp_repo import DPRepo
+from dplex.dp_filters import DPFilters
+from dplex.internal.sort import Sort, Order
 
 
 class DPService(
@@ -91,11 +94,7 @@ class DPService(
         Returns:
             Новый экземпляр SQLAlchemy модели
         """
-        if isinstance(schema, BaseModel):
-            data = schema.model_dump(exclude_unset=True)
-        else:
-            data = schema.__dict__
-        return self.repository.model(**data)
+        return self.repository.model(**schema.model_dump(exclude_unset=True))
 
     def _apply_filter_to_query(
         self, query_builder: Any, filter_data: FilterSchemaType

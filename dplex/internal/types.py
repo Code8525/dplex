@@ -2,12 +2,13 @@
 
 import uuid
 from enum import StrEnum
-from typing import TypeVar
+from typing import TypeVar, TYPE_CHECKING
 
 from pydantic import BaseModel
 from sqlalchemy.orm import DeclarativeBase
 
-from dplex import (
+# Используем TYPE_CHECKING для избежания циклических импортов
+from dplex.internal.filters import (
     StringFilter,
     IntFilter,
     FloatFilter,
@@ -86,7 +87,7 @@ TypeVar для типа поля сортировки
 Ограничен StrEnum для обеспечения типобезопасности при сортировке.
 Используется в Sort[SortByType] и DPFilters[SortByType].
 """
-
+# Определяем FilterType только для type checkers
 FilterType = (
     StringFilter
     | IntFilter

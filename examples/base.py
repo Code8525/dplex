@@ -9,18 +9,12 @@ from sqlalchemy import String, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dplex import DPFilters, DPRepo, DPService
+from dplex.internal.filters import UUIDFilter, StringFilter, DateTimeFilter
+from dplex.internal.sort import Sort, Order, NullsPlacement
+
+
 # === dplex базис (у вас уже есть) ===
-from dplex import (
-    DPRepo,
-    DPService,
-    DPFilters,
-    Sort,
-    Order,
-    NullsPlacement,
-    StringFilter,
-    UUIDFilter,
-    DateTimeFilter,
-)
 
 
 # ===================== 1) Модель =====================

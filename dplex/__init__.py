@@ -5,14 +5,6 @@ dplex - Enterprise-grade data layer framework for Python
 __version__ = "0.1.0"
 
 __all__ = [
-    # Core classes
-    "DPRepo",
-    "DPService",
-    "DPFilters",
-    # Sort
-    "Sort",
-    "Order",
-    "NullsPlacement",
     # Filters
     "StringFilter",
     "IntFilter",
@@ -25,14 +17,21 @@ __all__ = [
     "TimestampFilter",
     "EnumFilter",
     "UUIDFilter",
+    # Core classes
+    "DPRepo",
+    "DPService",
+    "DPFilters",
+    # Sort
+    "Sort",
+    "Order",
+    "NullsPlacement",
 ]
 
 
-from dplex.dp_repo import DPRepo
-from dplex.dp_filters import DPFilters
-from dplex.dp_service import DPService
+from dplex.internal.sort import NullsPlacement, Order, Sort
 
-from dplex.filters import (
+
+from dplex.internal.filters import (
     StringFilter,
     IntFilter,
     FloatFilter,
@@ -45,4 +44,11 @@ from dplex.filters import (
     EnumFilter,
     UUIDFilter,
 )
-from dplex.sort import NullsPlacement, Order, Sort
+
+
+from dplex.dp_filters import DPFilters
+
+from dplex.dp_repo import DPRepo
+
+
+from dplex.dp_service import DPService
