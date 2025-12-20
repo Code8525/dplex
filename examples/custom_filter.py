@@ -242,7 +242,7 @@ async def run_examples() -> None:
     """Запустить все примеры"""
 
     # Создание движка и сессии
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=True)
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
     # Инициализация БД
     await init_database(engine)
