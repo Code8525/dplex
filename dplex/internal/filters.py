@@ -866,3 +866,80 @@ class UUIDFilter:
         Не является NULL (is not null). Проверяет, что UUID установлен.
         Пример: user_id IS NOT NULL → is_not_null=True
         """
+
+
+class WordsFilter:
+    """
+    Фильтр для поиска по нескольким словам с автоматической разбивкой строки
+
+    Автоматически разбивает строку на слова и предоставляет их для поиска.
+    Предназначен для кастомных фильтров, где нужно искать каждое слово
+    в разных колонках модели.
+
+    Args:
+        text: Строка для поиска, которая будет автоматически разбита на слова
+        columns: Список колонок модели для поиска (обязательный параметр).
+                Фильтр будет обработан стандартной логикой FilterApplier.
+
+    Examples:
+        >>> # Использование с указанием колонок (обязательный параметр)
+        >>> words_filter = WordsFilter("john developer", columns=[User.name, User.email, User.bio])
+        >>> # words_filter.words = ["john", "developer"]
+        >>>
+        >>> # В схеме фильтрации
+        >>> class UserFilters(DPFilters):
+        ...     query: WordsFilter | None = None
+        >>>
+        >>> filters = UserFilters(query=WordsFilter("python developer", columns=[User.name, User.email]))
+    """
+
+    def __init__(self, text: str, columns: list[Any]) -> None:
+        """
+        Инициализация фильтра слов
+
+        Args:
+            text: Строка для поиска, которая будет автоматически разбита на слова
+            columns: Список колонок модели для поиска (обязательный параметр)
+
+        Returns:
+            None
+        """
+        self.text = text.strip() if text else ""
+        """
+        Исходный текст для поиска
+        """
+        self.words = self._split_into_words(self.text)
+        """
+        Список слов, полученных из текста (автоматически разбивается)
+        """
+        self.columns = columns
+        """
+        Список колонок модели для поиска
+        """
+
+    @staticmethod
+    def _split_into_words(text: str) -> list[str]:
+        """
+        Разбить строку на слова
+
+        Удаляет пустые строки и лишние пробелы.
+
+        Args:
+            text: Строка для разбивки
+
+        Returns:
+            Список слов
+        """
+        if not text:
+            return []
+        return [word.strip() for word in text.split() if word.strip()]
+
+    def __repr__(self) -> str:
+        """Строковое представление для отладки"""
+        return f"WordsFilter(text='{self.text}', words={self.words}, columns={len(self.columns)} cols)"
+
+    def __str__(self) -> str:
+        """Человекочитаемое представление"""
+        if self.words:
+            return f"WordsFilter({len(self.words)} words: {', '.join(self.words)} in {len(self.columns)} columns)"
+        return "WordsFilter(empty)"

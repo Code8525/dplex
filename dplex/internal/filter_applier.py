@@ -25,6 +25,7 @@ from dplex.internal.filters import (
     TimeFilter,
     TimestampFilter,
     UUIDFilter,
+    WordsFilter,
 )
 from dplex.internal.types import FilterType
 
@@ -410,6 +411,53 @@ class FilterApplier:
         query_builder = self._apply_common_ops(query_builder, column, filter_data)
         return query_builder
 
+    def apply_words_filter(
+        self,
+        query_builder: SupportsFiltering,
+        filter_data: WordsFilter,
+    ) -> SupportsFiltering:
+        """
+        Применить фильтр слов к нескольким колонкам
+
+        Ищет каждое слово из filter_data.words в указанных колонках.
+        Для каждого слова создается условие OR (слово должно быть найдено хотя бы в одной колонке).
+        Все слова объединяются через AND (все слова должны быть найдены).
+
+        Args:
+            query_builder: Query builder для применения фильтров
+            filter_data: Экземпляр WordsFilter с указанными колонками
+
+        Returns:
+            Query builder с примененным фильтром слов
+
+        Examples:
+            >>> from sqlalchemy import and_, or_
+            >>> words_filter = WordsFilter("john developer", columns=[User.name, User.email])
+            >>> query = applier.apply_words_filter(query_builder, words_filter)
+        """
+        from sqlalchemy import and_, or_
+
+        search_columns = filter_data.columns
+
+        if not search_columns:
+            return query_builder
+
+        words = filter_data.words
+        if not words:
+            return query_builder
+
+        # Для каждого слова создаем условие: слово должно быть найдено хотя бы в одной колонке (OR)
+        word_conditions = []
+        for word in words:
+            column_conditions = [col.ilike(f"%{word}%") for col in search_columns]
+            word_conditions.append(or_(*column_conditions))
+
+        # Все слова должны быть найдены (AND между словами)
+        if word_conditions:
+            query_builder = query_builder.where(and_(*word_conditions))
+
+        return query_builder
+
     def apply_filters_from_schema(
         self,
         query_builder: SupportsFiltering,
@@ -421,7 +469,7 @@ class FilterApplier:
 
         Извлекает активные фильтры из DPFilters и применяет их к query builder.
         Автоматически определяет тип каждого фильтра и применяет соответствующий метод.
-        Пропускает поля, отсутствующие в модели.
+        Пропускает поля, отсутствующие в модели, кроме WordsFilter (который обрабатывается отдельно).
 
         Args:
             query_builder: Query builder для применения фильтров
@@ -452,6 +500,12 @@ class FilterApplier:
         for field_name, field_value in fields_dict.items():
             # Пропускаем None
             if field_value is None:
+                continue
+
+            # Обрабатываем WordsFilter отдельно (может быть кастомным фильтром)
+            if isinstance(field_value, WordsFilter):
+                # WordsFilter теперь всегда имеет колонки (обязательный параметр)
+                query_builder = self.apply_words_filter(query_builder, field_value)
                 continue
 
             # Пропускаем поля, отсутствующие в модели

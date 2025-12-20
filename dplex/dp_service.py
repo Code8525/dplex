@@ -1,6 +1,6 @@
 """Базовый сервис для бизнес-логики с автоматизацией фильтрации, сортировки и CRUD операций"""
 
-from typing import Any, Generic
+from typing import TYPE_CHECKING, Any, Generic
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,9 @@ from dplex.internal.types import (
 
 from dplex.dp_repo import DPRepo
 from dplex.dp_filters import DPFilters
+
+if TYPE_CHECKING:
+    from dplex.internal.query_builder import QueryBuilder
 from dplex.internal.sort import Sort, Order
 
 
@@ -97,8 +100,8 @@ class DPService(
         return self.repository.model(**schema.model_dump(exclude_unset=True))
 
     def _apply_filter_to_query(
-        self, query_builder: Any, filter_data: FilterSchemaType
-    ) -> Any:
+        self, query_builder: "QueryBuilder[ModelType]", filter_data: FilterSchemaType
+    ) -> "QueryBuilder[ModelType]":
         """
         Автоматическое применение фильтров к query builder
         Работает с DPFilters - автоматически применяет все активные фильтры.
@@ -110,10 +113,141 @@ class DPService(
         """
         # Если filter_data это наследник DPFilters
         if isinstance(filter_data, DPFilters):
-            # Автоматически применяем все активные фильтры
+            # Автоматически применяем все активные фильтры (обычные)
             query_builder = self.filter_applier.apply_filters_from_schema(
                 query_builder, self.repository.model, filter_data
             )
+            # Применяем кастомные фильтры (поля, которых нет в модели)
+            query_builder = self.apply_custom_filters(query_builder, filter_data)
+        return query_builder
+
+    def apply_custom_filters(
+        self, query_builder: "QueryBuilder[ModelType]", filter_data: FilterSchemaType
+    ) -> "QueryBuilder[ModelType]":
+        """
+        Применить кастомные фильтры к query builder
+
+        Кастомные фильтры - это поля в схеме фильтрации, которых нет в модели.
+        Этот метод можно переопределить в наследниках для обработки специфичных фильтров.
+
+        Args:
+            query_builder: QueryBuilder для добавления фильтров
+            filter_data: Схема фильтра (DPFilters)
+
+        Returns:
+            QueryBuilder с примененными кастомными фильтрами
+
+        Examples:
+            >>> class UserService(DPService[...]):
+            ...     def apply_custom_filters(self, query_builder, filter_data):
+            ...         # Получаем кастомные фильтры
+            ...         custom_filters = filter_data.get_custom_filters(self.repository.model)
+            ...
+            ...         # Обрабатываем фильтр 'query' для поиска по нескольким полям
+            ...         if 'query' in custom_filters:
+            ...             query_filter = custom_filters['query']
+            ...             if hasattr(query_filter, 'icontains') and query_filter.icontains:
+            ...                 search_term = query_filter.icontains
+            ...                 from sqlalchemy import or_
+            ...                 query_builder = query_builder.where(
+            ...                     or_(
+            ...                         User.name.ilike(f'%{search_term}%'),
+            ...                         User.email.ilike(f'%{search_term}%')
+            ...                     )
+            ...                 )
+            ...         return query_builder
+        """
+        if isinstance(filter_data, DPFilters):
+            # Получаем кастомные фильтры (поля, которых нет в модели)
+            custom_filters = filter_data.get_custom_filters(self.repository.model)
+            # По умолчанию ничего не делаем - можно переопределить в наследниках
+            # Это позволяет пользователям добавлять свою логику обработки кастомных фильтров
+            pass
+        return query_builder
+
+    def _get_custom_filters(self, filter_data: FilterSchemaType) -> dict[str, Any]:
+        """
+        Получить кастомные фильтры из схемы фильтрации
+
+        Helper метод для получения кастомных фильтров (полей, которых нет в модели).
+
+        Args:
+            filter_data: Схема фильтра (DPFilters)
+
+        Returns:
+            Словарь {field_name: filter_instance} с кастомными фильтрами
+
+        Examples:
+            >>> custom_filters = self._get_custom_filters(filter_data)
+            >>> if 'query' in custom_filters:
+            ...     # Обработать фильтр 'query'
+        """
+        if isinstance(filter_data, DPFilters):
+            return filter_data.get_custom_filters(self.repository.model)
+        return {}
+
+    def _apply_string_filter_operation(
+        self,
+        query_builder: "QueryBuilder[ModelType]",
+        filter_instance: Any,
+        operation: str,
+        columns: list[Any],
+        case_sensitive: bool = False,
+    ) -> "QueryBuilder[ModelType]":
+        """
+        Применить операцию StringFilter к нескольким колонкам через OR
+
+        Helper метод для упрощения обработки StringFilter операций
+        при поиске по нескольким полям одновременно.
+
+        Args:
+            query_builder: QueryBuilder для добавления фильтров
+            filter_instance: Экземпляр StringFilter
+            operation: Название операции ('icontains', 'contains', 'eq', 'starts_with', 'ends_with')
+            columns: Список колонок модели для поиска
+            case_sensitive: Учитывать регистр (True) или нет (False)
+
+        Returns:
+            QueryBuilder с примененным условием поиска
+
+        Examples:
+            >>> from sqlalchemy import or_
+            >>> columns = [User.name, User.email, User.bio]
+            >>> query_builder = self._apply_string_filter_operation(
+            ...     query_builder, query_filter, 'icontains', columns, case_sensitive=False
+            ... )
+        """
+        from sqlalchemy import or_
+
+        if not hasattr(filter_instance, operation):
+            return query_builder
+
+        search_term = getattr(filter_instance, operation, None)
+        if not search_term:
+            return query_builder
+
+        conditions = []
+        for column in columns:
+            if operation == "icontains":
+                conditions.append(column.ilike(f"%{search_term}%"))
+            elif operation == "contains":
+                conditions.append(column.like(f"%{search_term}%"))
+            elif operation == "eq":
+                conditions.append(column == search_term)
+            elif operation == "starts_with":
+                if case_sensitive:
+                    conditions.append(column.like(f"{search_term}%"))
+                else:
+                    conditions.append(column.ilike(f"{search_term}%"))
+            elif operation == "ends_with":
+                if case_sensitive:
+                    conditions.append(column.like(f"%{search_term}"))
+                else:
+                    conditions.append(column.ilike(f"%{search_term}"))
+
+        if conditions:
+            query_builder = query_builder.where(or_(*conditions))
+
         return query_builder
 
     @staticmethod

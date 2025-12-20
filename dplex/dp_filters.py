@@ -137,6 +137,38 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         """
         return len(self.get_active_filters())
 
+    def get_custom_filters(self, model: type) -> dict[str, Any]:
+        """
+        Получить кастомные фильтры (поля, которых нет в модели)
+
+        Используется для фильтров, которые не соответствуют полям модели,
+        но требуют специальной обработки (например, поиск по нескольким полям).
+
+        Args:
+            model: SQLAlchemy модель для проверки наличия полей
+
+        Returns:
+            Словарь {field_name: filter_instance} с кастомными фильтрами
+
+        Examples:
+            >>> class UserFilterableFields(DPFilters[UserSortField]):
+            ...     name: StringFilter | None = None
+            ...     query: StringFilter | None = None  # Кастомный фильтр
+            >>>
+            >>> filters = UserFilterableFields(query=StringFilter(icontains="john"))
+            >>> custom = filters.get_custom_filters(User)
+            >>> # custom = {"query": StringFilter(icontains="john")}
+        """
+        active_filters = self.get_active_filters()
+        custom_filters: dict[str, Any] = {}
+
+        for field_name, field_value in active_filters.items():
+            # Если поля нет в модели - это кастомный фильтр
+            if not hasattr(model, field_name):
+                custom_filters[field_name] = field_value
+
+        return custom_filters
+
     def clear_filters(self) -> None:
         """
         Очистить все фильтры (установить все поля фильтров в None)

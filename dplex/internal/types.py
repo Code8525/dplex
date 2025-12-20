@@ -20,6 +20,7 @@ from dplex.internal.filters import (
     BooleanFilter,
     EnumFilter,
     UUIDFilter,
+    WordsFilter,
 )
 
 ModelType = TypeVar("ModelType", bound=DeclarativeBase)
@@ -100,6 +101,7 @@ FilterType = (
     | BooleanFilter
     | EnumFilter
     | UUIDFilter
+    | WordsFilter
 )
 """
 Union тип всех доступных фильтров
@@ -119,4 +121,5 @@ Union тип всех доступных фильтров
     - BooleanFilter: Фильтрация булевых значений
     - EnumFilter: Фильтрация enum полей
     - UUIDFilter: Фильтрация UUID полей
+    - WordsFilter: Фильтр для поиска по нескольким словам с автоматической разбивкой
 """

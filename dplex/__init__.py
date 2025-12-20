@@ -17,6 +17,7 @@ __all__ = [
     "TimestampFilter",
     "EnumFilter",
     "UUIDFilter",
+    "WordsFilter",
     # Core classes
     "DPRepo",
     "DPService",
@@ -43,6 +44,7 @@ from dplex.internal.filters import (
     TimestampFilter,
     EnumFilter,
     UUIDFilter,
+    WordsFilter,
 )
 
 

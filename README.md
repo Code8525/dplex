@@ -621,6 +621,87 @@ filters.clear_filters()
 print(filters.has_filters())  # False
 ```
 
+### Кастомные фильтры
+
+Кастомные фильтры позволяют создавать фильтры для полей, которых нет в модели, но требуют специальной обработки (например, поиск по нескольким полям одновременно).
+
+#### Базовое использование
+
+```python
+from dplex import DPService, StringFilter
+
+class UserFilterableFields(DPFilters[UserSortField]):
+    name: StringFilter | None = None
+    email: StringFilter | None = None
+    # Кастомный фильтр - поля 'query' нет в модели User
+    query: StringFilter | None = None
+
+class UserService(DPService[...]):
+    def apply_custom_filters(self, query_builder, filter_data):
+        """Обработка кастомного фильтра 'query'"""
+        # Получаем кастомные фильтры через helper метод
+        custom_filters = self._get_custom_filters(filter_data)
+        
+        if 'query' not in custom_filters:
+            return query_builder
+        
+        query_filter = custom_filters['query']
+        search_columns = [User.name, User.email, User.bio]
+        
+        # Используем helper метод для обработки операций StringFilter
+        if hasattr(query_filter, 'icontains') and query_filter.icontains:
+            query_builder = self._apply_string_filter_operation(
+                query_builder, query_filter, 'icontains', search_columns, case_sensitive=False
+            )
+        elif hasattr(query_filter, 'contains') and query_filter.contains:
+            query_builder = self._apply_string_filter_operation(
+                query_builder, query_filter, 'contains', search_columns, case_sensitive=True
+            )
+        
+        return query_builder
+
+# Использование
+filters = UserFilterableFields(
+    query=StringFilter(icontains="john"),  # Поиск по всем полям
+    age=IntFilter(gte=18)  # Комбинация с обычным фильтром
+)
+users = await service.get_all(filters)
+```
+
+#### Ручная обработка (без helper методов)
+
+```python
+from sqlalchemy import or_
+
+class UserService(DPService[...]):
+    def apply_custom_filters(self, query_builder, filter_data):
+        custom_filters = self._get_custom_filters(filter_data)
+        
+        if 'query' in custom_filters:
+            query_filter = custom_filters['query']
+            if hasattr(query_filter, 'icontains') and query_filter.icontains:
+                search_term = query_filter.icontains
+                condition = or_(
+                    User.name.ilike(f'%{search_term}%'),
+                    User.email.ilike(f'%{search_term}%'),
+                    User.bio.ilike(f'%{search_term}%')
+                )
+                query_builder = query_builder.where(condition)
+        
+        return query_builder
+```
+
+**Особенности кастомных фильтров:**
+- Поля в схеме фильтрации, которых нет в модели
+- Обрабатываются через метод `apply_custom_filters()` в сервисе
+- Можно комбинировать с обычными фильтрами
+- Поддерживают все операции фильтрации (icontains, contains, eq и т.д.)
+- Гибкая логика (например, поиск по нескольким полям через OR)
+
+**Helper методы:**
+- `_get_custom_filters(filter_data)` - получить кастомные фильтры
+- `_apply_string_filter_operation(query_builder, filter, operation, columns, case_sensitive)` - применить операцию StringFilter к нескольким колонкам
+
 ### Информация о пагинации
 
 ```python
