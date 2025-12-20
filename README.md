@@ -17,8 +17,42 @@ dplex — это современный фреймворк для построе
 
 ## Установка
 
+### Установка через pip
+
 ```bash
 pip install dplex
+```
+
+### Установка через Poetry
+
+```bash
+poetry add dplex
+```
+
+### Обновление
+
+#### Обновление через pip
+
+```bash
+pip install --upgrade dplex
+```
+
+#### Обновление через Poetry
+
+```bash
+poetry update dplex
+```
+
+С очисткой кеша:
+
+**Linux/macOS/PowerShell:**
+```bash
+poetry cache clear pypi --all --no-interaction && poetry add dplex@latest
+```
+
+**Windows CMD:**
+```cmd
+poetry cache clear pypi --all --no-interaction; poetry add dplex@latest
 ```
 
 ### Требования
