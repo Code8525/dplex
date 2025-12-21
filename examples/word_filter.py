@@ -1,9 +1,10 @@
 """
-Пример использования кастомных фильтров
+Пример использования WordsFilter
 
-Демонстрирует работу с кастомными фильтрами, которые не соответствуют
-полям модели. WordsFilter теперь поддерживает указание колонок прямо в фильтре,
+Демонстрирует работу с WordsFilter для поиска по нескольким словам.
+WordsFilter поддерживает указание колонок прямо в фильтре,
 и обработка выполняется автоматически через стандартную логику FilterApplier.
+Фильтр может принимать None для text и columns - в этом случае он не применяется.
 """
 
 import asyncio
@@ -95,6 +96,7 @@ class UserFilters(DPFilters[UserSortField]):
     # Кастомный фильтр - поля 'query' нет в модели User
     # WordsFilter автоматически разбивает строку на слова
     # Колонки для поиска указываются при создании фильтра
+    # Если text или columns равны None, фильтр не применяется
     query: WordsFilter | None = None
 
 
@@ -119,13 +121,13 @@ class UserService(
 # ==================== ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ ====================
 
 
-async def example_custom_filter_basic(service: UserService) -> None:
+async def example_word_filter_basic(service: UserService) -> None:
     """
-    Пример: Базовое использование кастомного фильтра 'query'
+    Пример: Базовое использование WordsFilter
 
-    Использует: get_all() с кастомным фильтром
+    Использует: get_all() с WordsFilter
     """
-    print("\n=== CUSTOM FILTER: Базовый поиск ===")
+    print("\n=== WORDS FILTER: Базовый поиск ===")
 
     # Поиск по одному слову (колонки указаны в фильтре)
     filters = UserFilters(
@@ -138,7 +140,7 @@ async def example_custom_filter_basic(service: UserService) -> None:
         print(f"  - {user.name} ({user.email}) - {user.bio}")
 
     # Поиск по нескольким словам (колонки указаны в фильтре)
-    print("\n=== CUSTOM FILTER: Поиск по нескольким словам ===")
+    print("\n=== WORDS FILTER: Поиск по нескольким словам ===")
     filters = UserFilters(
         query=WordsFilter("john developer", columns=[User.name, User.email, User.bio])
     )
@@ -149,13 +151,59 @@ async def example_custom_filter_basic(service: UserService) -> None:
         print(f"  - {user.name} ({user.email}) - {user.bio}")
 
 
-async def example_custom_filter_combined(service: UserService) -> None:
+async def example_word_filter_with_none(service: UserService) -> None:
     """
-    Пример: Комбинация кастомного фильтра с обычными фильтрами
+    Пример: Использование WordsFilter с None
 
-    Использует: get_all() с кастомным и обычными фильтрами
+    Демонстрирует, что фильтр не применяется, если text или columns равны None.
+    Это упрощает использование фильтра - можно передать None вместо проверки значений.
     """
-    print("\n=== CUSTOM FILTER: Комбинация фильтров ===")
+    print("\n=== WORDS FILTER: Использование с None ===")
+
+    # Все пользователи (фильтр не применяется, так как text=None)
+    print("\n1. Фильтр с text=None и columns=None (фильтр не применяется):")
+    filters = UserFilters(query=WordsFilter(None, None))
+    users = await service.get_all(filters)
+    print(f"✓ Найдено всех пользователей: {len(users)}")
+    for user in users:
+        print(f"  - {user.name} ({user.email})")
+
+    # Все пользователи (фильтр не применяется, так как text=None)
+    print("\n2. Фильтр с text=None, но columns указаны (фильтр не применяется):")
+    filters = UserFilters(
+        query=WordsFilter(None, columns=[User.name, User.email, User.bio])
+    )
+    users = await service.get_all(filters)
+    print(f"✓ Найдено всех пользователей: {len(users)}")
+    for user in users:
+        print(f"  - {user.name} ({user.email})")
+
+    # Все пользователи (фильтр не применяется, так как columns=None)
+    print("\n3. Фильтр с text указан, но columns=None (фильтр не применяется):")
+    filters = UserFilters(query=WordsFilter("john", None))
+    users = await service.get_all(filters)
+    print(f"✓ Найдено всех пользователей: {len(users)}")
+    for user in users:
+        print(f"  - {user.name} ({user.email})")
+
+    # Нормальный фильтр для сравнения
+    print("\n4. Нормальный фильтр для сравнения (фильтр применяется):")
+    filters = UserFilters(
+        query=WordsFilter("john", columns=[User.name, User.email, User.bio])
+    )
+    users = await service.get_all(filters)
+    print(f"✓ Найдено пользователей по запросу 'john': {len(users)}")
+    for user in users:
+        print(f"  - {user.name} ({user.email})")
+
+
+async def example_word_filter_combined(service: UserService) -> None:
+    """
+    Пример: Комбинация WordsFilter с обычными фильтрами
+
+    Использует: get_all() с WordsFilter и обычными фильтрами
+    """
+    print("\n=== WORDS FILTER: Комбинация фильтров ===")
 
     # Поиск по нескольким словам + фильтр по возрасту (колонки указаны в фильтре)
     filters = UserFilters(
@@ -171,13 +219,13 @@ async def example_custom_filter_combined(service: UserService) -> None:
         print(f"  - {user.name}, возраст: {user.age}, bio: {user.bio}")
 
 
-async def example_custom_filter_multiple_words(service: UserService) -> None:
+async def example_word_filter_multiple_words(service: UserService) -> None:
     """
     Пример: Поиск по нескольким словам
 
     Использует: get_all() с несколькими словами в запросе
     """
-    print("\n=== CUSTOM FILTER: Поиск по нескольким словам ===")
+    print("\n=== WORDS FILTER: Поиск по нескольким словам ===")
 
     # Поиск по нескольким словам - все слова должны быть найдены (колонки указаны в фильтре)
     filters = UserFilters(
@@ -190,13 +238,13 @@ async def example_custom_filter_multiple_words(service: UserService) -> None:
         print(f"  - {user.name} ({user.email}) - {user.bio}")
 
 
-async def example_custom_filter_with_sort(service: UserService) -> None:
+async def example_word_filter_with_sort(service: UserService) -> None:
     """
-    Пример: Кастомный фильтр с сортировкой
+    Пример: WordsFilter с сортировкой
 
     Использует: get_all() с query и сортировкой
     """
-    print("\n=== CUSTOM FILTER: С сортировкой ===")
+    print("\n=== WORDS FILTER: С сортировкой ===")
 
     filters = UserFilters(
         query=WordsFilter("gmail", columns=[User.name, User.email, User.bio]),
@@ -209,13 +257,13 @@ async def example_custom_filter_with_sort(service: UserService) -> None:
         print(f"  - {user.name} ({user.email})")
 
 
-async def example_custom_filter_count(service: UserService) -> None:
+async def example_word_filter_count(service: UserService) -> None:
     """
-    Пример: Подсчет с кастомным фильтром
+    Пример: Подсчет с WordsFilter
 
-    Использует: count() с кастомным фильтром
+    Использует: count() с WordsFilter
     """
-    print("\n=== CUSTOM FILTER: Подсчет ===")
+    print("\n=== WORDS FILTER: Подсчет ===")
 
     filters = UserFilters(
         query=WordsFilter("python", columns=[User.name, User.email, User.bio])
@@ -223,6 +271,46 @@ async def example_custom_filter_count(service: UserService) -> None:
     count = await service.count(filters)
 
     print(f"✓ Найдено записей с 'python': {count}")
+
+
+async def example_word_filter_conditional(service: UserService) -> None:
+    """
+    Пример: Условное использование WordsFilter с None
+
+    Демонстрирует упрощенное использование фильтра - можно передать None
+    вместо проверки значений перед созданием фильтра.
+    """
+    print("\n=== WORDS FILTER: Условное использование ===")
+
+    # Симуляция получения параметров из запроса
+    search_text = None  # Может быть None или строка
+    search_columns = [User.name, User.email, User.bio]  # Может быть None или список
+
+    # Упрощенное использование - можно просто передать None
+    # Вместо проверки: if search_text and search_columns: ...
+    filters = UserFilters(
+        query=WordsFilter(search_text, search_columns),
+        age=IntFilter(gte=25),
+    )
+    users = await service.get_all(filters)
+
+    print(
+        f"✓ Найдено пользователей (фильтр по словам не применен, только по возрасту): {len(users)}"
+    )
+    for user in users:
+        print(f"  - {user.name}, возраст: {user.age}")
+
+    # Теперь с реальным текстом
+    search_text = "developer"
+    filters = UserFilters(
+        query=WordsFilter(search_text, search_columns),
+        age=IntFilter(gte=25),
+    )
+    users = await service.get_all(filters)
+
+    print(f"\n✓ Найдено разработчиков 25+: {len(users)}")
+    for user in users:
+        print(f"  - {user.name}, возраст: {user.age}, bio: {user.bio}")
 
 
 # ==================== ИНИЦИАЛИЗАЦИЯ БД ====================
@@ -286,21 +374,23 @@ async def run_examples() -> None:
         await service.session.commit()
 
         print("=" * 70)
-        print("ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ КАСТОМНЫХ ФИЛЬТРОВ")
+        print("ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ WORDS FILTER")
         print("=" * 70)
         print(f"\n✓ Создано {len(created_users)} тестовых пользователей")
 
         # Запускаем примеры
-        await example_custom_filter_basic(service)
-        await example_custom_filter_combined(service)
-        await example_custom_filter_multiple_words(service)
-        await example_custom_filter_with_sort(service)
-        await example_custom_filter_count(service)
+        await example_word_filter_basic(service)
+        await example_word_filter_with_none(service)
+        await example_word_filter_combined(service)
+        await example_word_filter_multiple_words(service)
+        await example_word_filter_with_sort(service)
+        await example_word_filter_count(service)
+        await example_word_filter_conditional(service)
 
         print("\n" + "=" * 70)
         print("✓ ВСЕ ПРИМЕРЫ УСПЕШНО ЗАВЕРШЕНЫ")
         print("=" * 70)
-        print("\nОСНОВНЫЕ ВОЗМОЖНОСТИ КАСТОМНЫХ ФИЛЬТРОВ:")
+        print("\nОСНОВНЫЕ ВОЗМОЖНОСТИ WORDS FILTER:")
         print("  1. Поля в схеме фильтрации, которых нет в модели")
         print("  2. WordsFilter с указанием колонок обрабатывается автоматически")
         print("  3. Можно комбинировать с обычными фильтрами")
@@ -308,6 +398,12 @@ async def run_examples() -> None:
         print("  5. AND между словами (все слова должны быть найдены)")
         print("  6. OR между колонками (слово может быть в любой колонке)")
         print("  7. Колонки указываются прямо в WordsFilter при создании")
+        print(
+            "  8. Поддержка None для text и columns - фильтр не применяется, если любой из них None"
+        )
+        print(
+            "  9. Упрощенное использование - можно передать None без дополнительных проверок"
+        )
 
 
 if __name__ == "__main__":

@@ -423,26 +423,34 @@ class FilterApplier:
         Для каждого слова создается условие OR (слово должно быть найдено хотя бы в одной колонке).
         Все слова объединяются через AND (все слова должны быть найдены).
 
+        Если filter_data.text или filter_data.columns равны None, фильтр не применяется.
+
         Args:
             query_builder: Query builder для применения фильтров
             filter_data: Экземпляр WordsFilter с указанными колонками
 
         Returns:
-            Query builder с примененным фильтром слов
+            Query builder с примененным фильтром слов (или без изменений, если фильтр не активен)
 
         Examples:
             >>> from sqlalchemy import and_, or_
             >>> words_filter = WordsFilter("john developer", columns=[User.name, User.email])
             >>> query = applier.apply_words_filter(query_builder, words_filter)
+            >>>
+            >>> # Фильтр не будет применен, если text или columns равны None
+            >>> inactive_filter = WordsFilter(None, None)
+            >>> query = applier.apply_words_filter(query_builder, inactive_filter)  # вернет query без изменений
         """
         from sqlalchemy import and_, or_
 
         search_columns = filter_data.columns
 
-        if not search_columns:
+        # Если columns равны None или пустые, фильтр не применяется
+        if search_columns is None or not search_columns:
             return query_builder
 
         words = filter_data.words
+        # Если words пустые (text был None или пустой), фильтр не применяется
         if not words:
             return query_builder
 

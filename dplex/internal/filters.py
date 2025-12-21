@@ -877,12 +877,13 @@ class WordsFilter:
     в разных колонках модели.
 
     Args:
-        text: Строка для поиска, которая будет автоматически разбита на слова
-        columns: Список колонок модели для поиска (обязательный параметр).
-                Фильтр будет обработан стандартной логикой FilterApplier.
+        text: Строка для поиска, которая будет автоматически разбита на слова.
+              Если None, фильтр не будет применяться.
+        columns: Список колонок модели для поиска.
+                 Если None, фильтр не будет применяться.
 
     Examples:
-        >>> # Использование с указанием колонок (обязательный параметр)
+        >>> # Использование с указанием колонок
         >>> words_filter = WordsFilter("john developer", columns=[User.name, User.email, User.bio])
         >>> # words_filter.words = ["john", "developer"]
         >>>
@@ -891,20 +892,29 @@ class WordsFilter:
         ...     query: WordsFilter | None = None
         >>>
         >>> filters = UserFilters(query=WordsFilter("python developer", columns=[User.name, User.email]))
+        >>>
+        >>> # Упрощенное использование: если text или columns равны None, фильтр не применяется
+        >>> filters = UserFilters(query=WordsFilter(None, None))  # фильтр не будет применен
+        >>> filters = UserFilters(query=WordsFilter("text", None))  # фильтр не будет применен
+        >>> filters = UserFilters(query=WordsFilter(None, [User.name]))  # фильтр не будет применен
     """
 
-    def __init__(self, text: str, columns: list[Any]) -> None:
+    def __init__(
+        self, text: str | None = None, columns: list[Any] | None = None
+    ) -> None:
         """
         Инициализация фильтра слов
 
         Args:
-            text: Строка для поиска, которая будет автоматически разбита на слова
-            columns: Список колонок модели для поиска (обязательный параметр)
+            text: Строка для поиска, которая будет автоматически разбита на слова.
+                  Если None, фильтр не будет применяться.
+            columns: Список колонок модели для поиска.
+                     Если None, фильтр не будет применяться.
 
         Returns:
             None
         """
-        self.text = text.strip() if text else ""
+        self.text = text.strip() if text is not None else ""
         """
         Исходный текст для поиска
         """
@@ -936,10 +946,15 @@ class WordsFilter:
 
     def __repr__(self) -> str:
         """Строковое представление для отладки"""
-        return f"WordsFilter(text='{self.text}', words={self.words}, columns={len(self.columns)} cols)"
+        cols_info = f"{len(self.columns)} cols" if self.columns else "None"
+        return (
+            f"WordsFilter(text='{self.text}', words={self.words}, columns={cols_info})"
+        )
 
     def __str__(self) -> str:
         """Человекочитаемое представление"""
+        if self.columns is None or self.text is None or not self.text:
+            return "WordsFilter(inactive)"
         if self.words:
             return f"WordsFilter({len(self.words)} words: {', '.join(self.words)} in {len(self.columns)} columns)"
         return "WordsFilter(empty)"
