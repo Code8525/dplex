@@ -9,16 +9,15 @@ import asyncio
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import String, Integer
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Integer, String
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from dplex import DPService, Sort, Order
-from dplex.dp_repo import DPRepo
+from dplex import DPService, Order, Sort
 from dplex.dp_filters import DPFilters
-from dplex.internal.filters import StringFilter, IntFilter, DateTimeFilter
-
+from dplex.dp_repo import DPRepo
+from dplex.internal.filters import DateTimeFilter, IntFilter, StringFilter
 
 # ==================== МОДЕЛИ И СХЕМЫ ====================
 
@@ -143,7 +142,7 @@ async def example_create_single(service: UserService) -> None:
     created_user = await service.create(new_user)
     await service.session.commit()
 
-    print(f"✓ Создан пользователь:")
+    print("✓ Создан пользователь:")
     print(f"  ID: {created_user.id}")
     print(f"  Name: {created_user.name}")
     print(f"  Email: {created_user.email}")
@@ -546,7 +545,7 @@ async def example_update_by_ids_with_null(service: UserService) -> None:
     # Очистить phone у всех
     update_data = UserUpdate(phone=None)
 
-    updated_users = await service.update_by_ids(user_ids, update_data)
+    await service.update_by_ids(user_ids, update_data)
     await service.session.commit()
 
 
