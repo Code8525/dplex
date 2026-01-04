@@ -1,9 +1,8 @@
 """Базовая схема для работы с фильтрами, сортировкой и пагинацией"""
 
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 from dplex.internal.sort import Sort
 
@@ -11,7 +10,7 @@ from dplex.internal.sort import Sort
 SortFieldType = TypeVar("SortFieldType")
 
 
-class DPFilters(BaseModel, Generic[SortFieldType]):
+class DPFilters[SortFieldType](BaseModel):
     """
     Базовая схема для фильтруемых полей с поддержкой сортировки и пагинации
 
@@ -96,7 +95,7 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         special_fields = {"sort", "limit", "offset"}
         result: dict[str, Any] = {}
 
-        for field_name in type(self).model_fields.keys():
+        for field_name in type(self).model_fields:
             if field_name in special_fields:
                 continue
 
@@ -187,7 +186,7 @@ class DPFilters(BaseModel, Generic[SortFieldType]):
         # Поля, которые не нужно очищать
         special_fields = {"sort", "limit", "offset"}
 
-        for field_name in type(self).model_fields.keys():
+        for field_name in type(self).model_fields:
             if field_name not in special_fields:
                 setattr(self, field_name, None)
 

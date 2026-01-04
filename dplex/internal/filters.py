@@ -3,14 +3,14 @@
 from datetime import date, datetime, time
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 # Определяем типы для различных данных
 T = TypeVar("T")
 EnumT = TypeVar("EnumT", bound=Enum)
 
 
-class BaseNumberFilter(Generic[T]):
+class BaseNumberFilter[T]:
     """
     Базовый фильтр для числовых полей
 
@@ -398,7 +398,7 @@ class BooleanFilter:
         """
 
 
-class BaseDateTimeFilter(Generic[T]):
+class BaseDateTimeFilter[T]:
     """
     Базовый фильтр для временных данных (datetime, date, time)
 
@@ -674,7 +674,7 @@ class TimeFilter(BaseDateTimeFilter[time]):
     pass
 
 
-class EnumFilter(Generic[EnumT]):
+class EnumFilter[EnumT: Enum]:
     """
     Фильтр для Enum полей
 

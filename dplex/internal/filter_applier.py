@@ -6,11 +6,10 @@ from enum import Enum
 from typing import Any, Protocol
 from uuid import UUID
 
-from dplex.dp_filters import DPFilters
-
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
+from dplex.dp_filters import DPFilters
 from dplex.internal.filters import (
     BaseDateTimeFilter,
     BaseNumberFilter,

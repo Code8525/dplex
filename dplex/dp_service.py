@@ -1,11 +1,23 @@
 """Базовый сервис для бизнес-логики с автоматизацией фильтрации, сортировки и CRUD операций"""
 
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any
+
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dplex.dp_filters import DPFilters
+from dplex.dp_repo import DPRepo
 from dplex.internal.filter_applier import FilterApplier
 from dplex.internal.types import (
+    ModelType,
+)
+
+if TYPE_CHECKING:
+    from dplex.internal.query_builder import QueryBuilder
+from dplex.internal.sort import Order, Sort
+
+
+class DPService[
     ModelType,
     KeyType,
     CreateSchemaType,
@@ -13,27 +25,7 @@ from dplex.internal.types import (
     ResponseSchemaType,
     FilterSchemaType,
     SortFieldSchemaType,
-)
-
-from dplex.dp_repo import DPRepo
-from dplex.dp_filters import DPFilters
-
-if TYPE_CHECKING:
-    from dplex.internal.query_builder import QueryBuilder
-from dplex.internal.sort import Sort, Order
-
-
-class DPService(
-    Generic[
-        ModelType,
-        KeyType,
-        CreateSchemaType,
-        UpdateSchemaType,
-        ResponseSchemaType,
-        FilterSchemaType,
-        SortFieldSchemaType,
-    ]
-):
+]:
     """
     Базовый сервис для бизнес-логики с автоматизацией
     Предоставляет полный набор CRUD операций с автоматической обработкой:
@@ -159,7 +151,7 @@ class DPService(
         """
         if isinstance(filter_data, DPFilters):
             # Получаем кастомные фильтры (поля, которых нет в модели)
-            custom_filters = filter_data.get_custom_filters(self.repository.model)
+            filter_data.get_custom_filters(self.repository.model)
             # По умолчанию ничего не делаем - можно переопределить в наследниках
             # Это позволяет пользователям добавлять свою логику обработки кастомных фильтров
             pass
@@ -432,18 +424,20 @@ class DPService(
         self, filter_data: FilterSchemaType
     ) -> ResponseSchemaType | None:
         """
-        Получить первую сущность с фильтрацией
+        Получить первую сущность с фильтрацией и сортировкой
+        Автоматически применяет все фильтры, сортировку, limit и offset из DPFilters.
         Args:
-            filter_data: Схема фильтра
+            filter_data: Схема фильтра с параметрами поиска (DPFilters)
         Returns:
             Первая найденная схема или None
         """
-        query_builder = self.repository.query()
-        query_builder = self._apply_filter_to_query(query_builder, filter_data)
-        model = await query_builder.find_one()
-        if model is None:
-            return None
-        return self._model_to_schema(model)
+        if isinstance(filter_data, DPFilters):
+            first_filter = filter_data.model_copy()
+            first_filter.limit = 1
+        else:
+            first_filter = filter_data
+        results = await self.get_all(first_filter)
+        return results[0] if results else None
 
     async def count(self, filter_data: FilterSchemaType) -> int:
         """

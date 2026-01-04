@@ -1,6 +1,6 @@
 """Query Builder для построения типизированных SQL запросов с поддержкой фильтрации и сортировки"""
 
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import ColumnElement, asc, desc, nullsfirst, nullslast
 from sqlalchemy.orm import InstrumentedAttribute
@@ -10,10 +10,10 @@ from dplex.internal.types import ModelType
 if TYPE_CHECKING:
     from dplex.dp_repo import DPRepo
 
-from dplex.internal.sort import NullsPlacement, Sort, Order
+from dplex.internal.sort import NullsPlacement, Order, Sort
 
 
-class QueryBuilder(Generic[ModelType]):
+class QueryBuilder[ModelType]:
     """
     Query Builder для построения типизированных SQL запросов
 
@@ -409,10 +409,7 @@ class QueryBuilder(Generic[ModelType]):
             Self для цепочки вызовов
         """
         # Создаем базовую сортировку
-        if desc_order:
-            order_clause = desc(column)
-        else:
-            order_clause = asc(column)
+        order_clause = desc(column) if desc_order else asc(column)
 
         # Применяем nulls placement если указан
         if nulls_placement == NullsPlacement.FIRST:

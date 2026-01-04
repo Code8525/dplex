@@ -1,6 +1,6 @@
 [project]
 name = "dplex"
-version = "0.1.9"
+version = "0.2.0"
 description = ""
 authors = [
     {name = "Igor Chesnokov",email = "front-gold@mail.ru"}
@@ -19,6 +19,7 @@ dependencies = [
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+# Файл py.typed автоматически включается в пакет при сборке
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.13.2"
@@ -32,7 +33,7 @@ pre-commit = "^4.3.0"
 line-length = 88
 target-version = "py312"  # или "py312" для Python 3.12
 fix = true
-include = ["./src/**"]
+include = ["./dplex/**"]
 
 
 [tool.ruff.lint]
@@ -59,10 +60,10 @@ ignore = [
 # Версия Python для анализа (учитывает синтаксис 3.12: | вместо Optional, list[...] вместо List и т.д.)
 python_version = "3.12"
 
-# Ограничиваем анализ директорией src/, чтобы не проверял весь проект подряд
-files = ["src"]
+# Ограничиваем анализ директорией dplex/, чтобы не проверял весь проект подряд
+files = ["dplex"]
 
-# Требуем, чтобы mypy рассматривал src как пакет
+# Требуем, чтобы mypy рассматривал dplex как пакет
 explicit_package_bases = true
 
 # Подключаем плагин для корректной работы с Pydantic v2
@@ -88,5 +89,20 @@ follow_imports = "silent"
 # - no-untyped-def → не ругаемся на функции без type hints (если где-то ещё остались)
 disable_error_code = ["import-untyped"]
 
+[tool.pyright]
+# Конфигурация для Pyright/Pylance
+include = ["dplex"]
+exclude = ["**/__pycache__", "**/node_modules", "dist", "build", "tests"]
+pythonVersion = "3.9"
+typeCheckingMode = "basic"
+reportMissingTypeStubs = false
+reportUnusedImport = true
+reportUnusedVariable = true
+reportUnusedFunction = true
+reportUnusedClass = true
 
+[tool.pylance]
+# Конфигурация для Pylance (альтернативная)
+include = ["dplex"]
+exclude = ["**/__pycache__", "**/node_modules", "dist", "build", "tests"]
 

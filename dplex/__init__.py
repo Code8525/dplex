@@ -29,28 +29,21 @@ __all__ = [
 ]
 
 
-from dplex.internal.sort import NullsPlacement, Order, Sort
-
-
+from dplex.dp_filters import DPFilters
+from dplex.dp_repo import DPRepo
+from dplex.dp_service import DPService
 from dplex.internal.filters import (
-    StringFilter,
-    IntFilter,
-    FloatFilter,
-    DecimalFilter,
     BooleanFilter,
     DateFilter,
     DateTimeFilter,
+    DecimalFilter,
+    EnumFilter,
+    FloatFilter,
+    IntFilter,
+    StringFilter,
     TimeFilter,
     TimestampFilter,
-    EnumFilter,
     UUIDFilter,
     WordsFilter,
 )
-
-
-from dplex.dp_filters import DPFilters
-
-from dplex.dp_repo import DPRepo
-
-
-from dplex.dp_service import DPService
+from dplex.internal.sort import NullsPlacement, Order, Sort

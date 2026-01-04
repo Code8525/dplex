@@ -2,9 +2,6 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Generic
-
-from dplex.internal.types import SortByType
 
 
 class Order(StrEnum):
@@ -57,7 +54,7 @@ class NullsPlacement(StrEnum):
 
 
 @dataclass(frozen=True)
-class Sort(Generic[SortByType]):
+class Sort[SortByType]:
     """
     Элемент сортировки для запросов
 

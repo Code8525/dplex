@@ -1,15 +1,17 @@
 """Базовый репозиторий для работы с SQLAlchemy моделями"""
 
 import uuid
-from typing import Any, Generic
+from typing import Any
+
 from sqlalchemy import ColumnElement, and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
+
 from dplex.internal.query_builder import QueryBuilder
-from dplex.internal.types import KeyType, ModelType
+from dplex.internal.types import ModelType
 
 
-class DPRepo(Generic[ModelType, KeyType]):
+class DPRepo[ModelType, KeyType]:
     """
     Базовый репозиторий для работы с SQLAlchemy моделями
     Предоставляет стандартные CRUD операции и интеграцию с QueryBuilder
