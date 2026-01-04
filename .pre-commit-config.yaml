@@ -19,3 +19,20 @@ repos:
       args: ['.']
       types: [ python ]
       always_run: true
+
+    - id: mypy
+      name: Mypy
+      language: system
+      entry: poetry run mypy dplex
+      args: [ "--config-file=pyproject.toml" ]
+      types: [ python ]
+      files: ^dplex/
+      always_run: true
+
+    - id: pyright
+      name: Pyright
+      language: system
+      entry: poetry run pyright src
+      types: [ python ]
+      files: ^dplex/
+      always_run: true
