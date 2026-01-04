@@ -91,9 +91,7 @@ class UserRepo(DPRepo[User, uuid.UUID]):
 
     def __init__(self, session: AsyncSession):
         # id_field_name должен соответствовать названию PK в модели
-        super().__init__(
-            model=User, session=session, id_field_name="user_id"
-        )
+        super().__init__(model=User, session=session, id_field_name="user_id")
 
 
 # ===================== 5) Сервис =====================

@@ -81,9 +81,7 @@ class UserFilters(DPFilters[UserSortField]):
 # ===================== 4) Репозиторий =====================
 class UserRepo(DPRepo[User, uuid.UUID]):
     def __init__(self, session: AsyncSession):
-        super().__init__(
-            model=User, session=session, id_field_name="user_id"
-        )
+        super().__init__(model=User, session=session, id_field_name="user_id")
 
 
 # ===================== 5) Сервис =====================

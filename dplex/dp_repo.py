@@ -1,7 +1,6 @@
 """Базовый репозиторий для работы с SQLAlchemy моделями"""
 
-import uuid
-from typing import Any, overload
+from typing import Any
 
 from sqlalchemy import ColumnElement, and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession

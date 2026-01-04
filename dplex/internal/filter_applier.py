@@ -3,7 +3,7 @@
 import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -77,6 +77,8 @@ class SupportsFiltering(Protocol):
     def where_like(self, column: Any, pattern: str) -> Any: ...
 
     def where_ilike(self, column: Any, pattern: str) -> Any: ...
+
+    def where(self, condition: Any) -> Any: ...
 
 
 class FilterApplier:
@@ -376,7 +378,7 @@ class FilterApplier:
         if not sa_enum:
             return filt
 
-        def map_list(lst):
+        def map_list(lst: list[Any] | None) -> list[Any] | None:
             return (
                 None
                 if lst is None
@@ -578,13 +580,19 @@ class FilterApplier:
         # Применяем соответствующий метод в зависимости от типа фильтра
         # Строковые фильтры
         if filter_type == StringFilter:
-            return self.apply_string_filter(query_builder, column, filter_instance)
+            return self.apply_string_filter(
+                query_builder, column, cast(StringFilter, filter_instance)
+            )
         # Булевые фильтры
         elif filter_type == BooleanFilter:
-            return self.apply_boolean_filter(query_builder, column, filter_instance)
+            return self.apply_boolean_filter(
+                query_builder, column, cast(BooleanFilter, filter_instance)
+            )
         # Числовые фильтры (используем базовый метод для всех)
         elif filter_type in (IntFilter, FloatFilter, DecimalFilter, BaseNumberFilter):
-            return self.apply_base_number_filter(query_builder, column, filter_instance)
+            return self.apply_base_number_filter(
+                query_builder, column, cast(BaseNumberFilter[Any], filter_instance)
+            )
         # Фильтры даты/времени (используем базовый метод для всех)
         elif filter_type in (
             DateTimeFilter,
@@ -594,14 +602,18 @@ class FilterApplier:
             BaseDateTimeFilter,
         ):
             return self.apply_base_datetime_filter(
-                query_builder, column, filter_instance
+                query_builder, column, cast(BaseDateTimeFilter[Any], filter_instance)
             )
         # Enum фильтры
         elif filter_type == EnumFilter:
-            return self.apply_enum_filter(query_builder, column, filter_instance)
+            return self.apply_enum_filter(
+                query_builder, column, cast(EnumFilter[Any], filter_instance)
+            )
         # UUID фильтры
         elif filter_type == UUIDFilter:
-            return self.apply_uuid_filter(query_builder, column, filter_instance)
+            return self.apply_uuid_filter(
+                query_builder, column, cast(UUIDFilter, filter_instance)
+            )
 
         return query_builder
 

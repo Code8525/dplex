@@ -32,7 +32,7 @@ repos:
     - id: pyright
       name: Pyright
       language: system
-      entry: poetry run pyright src
+      entry: poetry run pyright dplex
       types: [ python ]
       files: ^dplex/
       always_run: true

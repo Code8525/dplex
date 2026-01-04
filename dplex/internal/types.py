@@ -2,13 +2,15 @@
 
 import uuid
 from enum import StrEnum
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 from sqlalchemy.orm import DeclarativeBase
 
 # Используем TYPE_CHECKING для избежания циклических импортов
 from dplex.internal.filters import (
+    BaseDateTimeFilter,
+    BaseNumberFilter,
     BooleanFilter,
     DateFilter,
     DateTimeFilter,
@@ -94,12 +96,14 @@ FilterType = (
     | IntFilter
     | FloatFilter
     | DecimalFilter
+    | BaseNumberFilter[Any]
     | DateTimeFilter
     | DateFilter
     | TimeFilter
     | TimestampFilter
+    | BaseDateTimeFilter[Any]
     | BooleanFilter
-    | EnumFilter
+    | EnumFilter[Any]
     | UUIDFilter
     | WordsFilter
 )
