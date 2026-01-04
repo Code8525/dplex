@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
 from dplex.internal.query_builder import QueryBuilder
-from dplex.internal.types import ModelType
 
 
 class DPRepo[ModelType, KeyType]:

@@ -35,7 +35,6 @@ mypy = "^1.19.1"
 line-length = 88
 target-version = "py312"  # или "py312" для Python 3.12
 fix = true
-include = ["./dplex/**"]
 
 
 [tool.ruff.lint]

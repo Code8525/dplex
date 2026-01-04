@@ -5,8 +5,6 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import ColumnElement, asc, desc, nullsfirst, nullslast
 from sqlalchemy.orm import InstrumentedAttribute
 
-from dplex.internal.types import ModelType
-
 if TYPE_CHECKING:
     from dplex.dp_repo import DPRepo
 

@@ -6,7 +6,7 @@ repos:
       language: system
       entry: poetry run ruff check
       args: ["--fix", "--unsafe-fixes"]
-      files: ^src/
+      files: ^dplex/
       types: [ python ]
       stages: [ pre-commit ]
       always_run: true
@@ -27,6 +27,7 @@ repos:
       args: [ "--config-file=pyproject.toml" ]
       types: [ python ]
       files: ^dplex/
+      pass_filenames: false
       always_run: true
 
     - id: pyright

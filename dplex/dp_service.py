@@ -9,9 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dplex.dp_filters import DPFilters
 from dplex.dp_repo import DPRepo
 from dplex.internal.filter_applier import FilterApplier
-from dplex.internal.types import (
-    ModelType,
-)
 
 if TYPE_CHECKING:
     from dplex.internal.query_builder import QueryBuilder
