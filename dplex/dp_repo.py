@@ -1,7 +1,7 @@
 """Базовый репозиторий для работы с SQLAlchemy моделями"""
 
 import uuid
-from typing import Any
+from typing import Any, overload
 
 from sqlalchemy import ColumnElement, and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,6 @@ class DPRepo[ModelType, KeyType]:
     Attributes:
         model: Класс SQLAlchemy модели
         session: Асинхронная сессия SQLAlchemy
-        key_type: Тип первичного ключа
         id_field_name: Имя поля первичного ключа в модели
     """
 
@@ -32,7 +31,6 @@ class DPRepo[ModelType, KeyType]:
         self,
         model: type[ModelType],
         session: AsyncSession,
-        key_type: type[KeyType] = uuid.UUID,
         id_field_name: str = "id",
     ) -> None:
         """
@@ -41,7 +39,6 @@ class DPRepo[ModelType, KeyType]:
         Args:
             model: Класс SQLAlchemy модели
             session: Асинхронная сессия SQLAlchemy
-            key_type: Тип первичного ключа (по умолчанию uuid.UUID)
             id_field_name: Имя поля первичного ключа (по умолчанию "id")
 
         Returns:
@@ -52,7 +49,6 @@ class DPRepo[ModelType, KeyType]:
         """
         self.model = model
         self.session = session
-        self.key_type = key_type
         self.id_field_name = id_field_name
         self._id_column = self._get_id_column()
 

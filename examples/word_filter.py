@@ -339,7 +339,7 @@ async def run_examples() -> None:
     async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
     async with async_session_maker() as session:
-        repository = DPRepo(model=User, session=session, key_type=int)
+        repository: DPRepo[User, int] = DPRepo(model=User, session=session)
         service = UserService(repository, session, UserResponse)
 
         # Создаем тестовые данные

@@ -82,7 +82,7 @@ class UserFilters(DPFilters[UserSortField]):
 class UserRepo(DPRepo[User, uuid.UUID]):
     def __init__(self, session: AsyncSession):
         super().__init__(
-            model=User, session=session, key_type=uuid.UUID, id_field_name="user_id"
+            model=User, session=session, id_field_name="user_id"
         )
 
 
