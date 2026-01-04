@@ -1,6 +1,7 @@
 """Базовый сервис для бизнес-логики с автоматизацией фильтрации, сортировки и CRUD операций"""
 
-from typing import TYPE_CHECKING, Any
+from enum import Enum
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +25,7 @@ class DPService[
     UpdateSchemaType: BaseModel,
     ResponseSchemaType: BaseModel,
     FilterSchemaType,
-    SortFieldSchemaType,
+    SortFieldSchemaType: Enum,
 ]:
     """
     Базовый сервис для бизнес-логики с автоматизацией
@@ -40,7 +41,7 @@ class DPService[
         UpdateSchemaType: Pydantic схема для обновления (должна наследоваться от BaseModel)
         ResponseSchemaType: Pydantic схема для ответа (должна наследоваться от BaseModel)
         FilterSchemaType: Схема фильтрации (наследник DPFilters)
-        SortFieldSchemaType: Enum полей для сортировки
+        SortFieldSchemaType: Enum полей для сортировки (должен наследоваться от Enum)
     Attributes:
         repository: Репозиторий для доступа к данным
         session: Асинхронная SQLAlchemy сессия
@@ -106,8 +107,11 @@ class DPService[
         # Если filter_data это наследник DPFilters
         if isinstance(filter_data, DPFilters):
             # Автоматически применяем все активные фильтры (обычные)
-            query_builder = self.filter_applier.apply_filters_from_schema(
-                query_builder, self.repository.model, filter_data
+            query_builder = cast(
+                "QueryBuilder[ModelType]",
+                self.filter_applier.apply_filters_from_schema(
+                    query_builder, self.repository.model, filter_data
+                ),
             )
             # Применяем кастомные фильтры (поля, которых нет в модели)
             query_builder = self.apply_custom_filters(query_builder, filter_data)
@@ -341,6 +345,37 @@ class DPService[
         """
         return update_data.model_dump(exclude_unset=True)
 
+    def _clone_and_modify_filter(
+        self,
+        filter_data: FilterSchemaType,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> FilterSchemaType:
+        """
+        Вспомогательный метод для безопасного копирования и изменения фильтров.
+        Создает копию схемы (если это Pydantic модель) и обновляет параметры лимита и смещения.
+        Args:
+            filter_data: Оригинальная схема фильтрации
+            limit: Новый лимит (опционально)
+            offset: Новое смещение (опционально)
+        Returns:
+            Новая (или та же, если не Pydantic) схема с обновленными параметрами
+        """
+        if not isinstance(filter_data, (BaseModel, DPFilters)):
+            return filter_data
+
+        # Копируем через Pydantic
+        new_filter = cast(BaseModel, filter_data).model_copy()
+
+        # Если это DPFilters, мы можем менять limit/offset
+        if isinstance(new_filter, DPFilters):
+            if limit is not None:
+                new_filter.limit = limit
+            if offset is not None:
+                new_filter.offset = offset
+
+        return cast(FilterSchemaType, new_filter)
+
     def _apply_base_filters(
         self, query_builder: Any, filter_data: FilterSchemaType
     ) -> Any:
@@ -430,11 +465,7 @@ class DPService[
         Returns:
             Первая найденная схема или None
         """
-        if isinstance(filter_data, DPFilters):
-            first_filter = filter_data.model_copy()
-            first_filter.limit = 1
-        else:
-            first_filter = filter_data
+        first_filter = self._clone_and_modify_filter(filter_data, limit=1)
         results = await self.get_all(first_filter)
         return results[0] if results else None
 
@@ -637,14 +668,9 @@ class DPService[
 
         total_count = await self.count(filter_data)
 
-        if isinstance(filter_data, BaseModel):
-            paginated_filter = filter_data.model_copy()
-        else:
-            paginated_filter = filter_data
-
-        if isinstance(paginated_filter, DPFilters):
-            paginated_filter.limit = per_page
-            paginated_filter.offset = (page - 1) * per_page
+        paginated_filter = self._clone_and_modify_filter(
+            filter_data, limit=per_page, offset=(page - 1) * per_page
+        )
 
         items = await self.get_all(paginated_filter)
         return items, total_count
