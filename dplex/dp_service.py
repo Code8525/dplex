@@ -20,9 +20,9 @@ from dplex.internal.sort import Order, Sort
 class DPService[
     ModelType,
     KeyType,
-    CreateSchemaType,
-    UpdateSchemaType,
-    ResponseSchemaType,
+    CreateSchemaType: BaseModel,
+    UpdateSchemaType: BaseModel,
+    ResponseSchemaType: BaseModel,
     FilterSchemaType,
     SortFieldSchemaType,
 ]:
@@ -36,9 +36,9 @@ class DPService[
     Type Parameters:
         ModelType: SQLAlchemy модель
         KeyType: Тип первичного ключа (int, str, UUID)
-        CreateSchemaType: Pydantic схема для создания
-        UpdateSchemaType: Pydantic схема для обновления
-        ResponseSchemaType: Pydantic схема для ответа
+        CreateSchemaType: Pydantic схема для создания (должна наследоваться от BaseModel)
+        UpdateSchemaType: Pydantic схема для обновления (должна наследоваться от BaseModel)
+        ResponseSchemaType: Pydantic схема для ответа (должна наследоваться от BaseModel)
         FilterSchemaType: Схема фильтрации (наследник DPFilters)
         SortFieldSchemaType: Enum полей для сортировки
     Attributes:
@@ -325,8 +325,7 @@ class DPService[
             return self._normalize_sort_list(filter_data.sort)
         return []
 
-    @staticmethod
-    def _make_update_dict(update_data: BaseModel) -> dict[str, Any]:
+    def _make_update_dict(self, update_data: UpdateSchemaType) -> dict[str, Any]:
         """
         Сформировать словарь для частичного обновления записи
         Метод анализирует модель и возвращает только те поля, которые были
