@@ -138,25 +138,23 @@ class FilterApplier:
         Returns:
             Query builder с примененными общими операциями
         """
-        if hasattr(filter_data, "eq") and filter_data.eq is not None:
-            query_builder = query_builder.where_eq(column, filter_data.eq)
-        if hasattr(filter_data, "ne") and filter_data.ne is not None:
-            query_builder = query_builder.where_ne(column, filter_data.ne)
-        if hasattr(filter_data, "in_") and filter_data.in_ is not None:
-            query_builder = query_builder.where_in(column, filter_data.in_)
-        if hasattr(filter_data, "not_in") and filter_data.not_in is not None:
-            query_builder = query_builder.where_not_in(column, filter_data.not_in)
-        if (
-            hasattr(filter_data, "is_null")
-            and filter_data.is_null is not None
-            and filter_data.is_null
-        ):
+        eq_value = getattr(filter_data, "eq", None)
+        if eq_value is not None:
+            query_builder = query_builder.where_eq(column, eq_value)
+        ne_value = getattr(filter_data, "ne", None)
+        if ne_value is not None:
+            query_builder = query_builder.where_ne(column, ne_value)
+        in_value = getattr(filter_data, "in_", None)
+        if in_value is not None:
+            query_builder = query_builder.where_in(column, in_value)
+        not_in_value = getattr(filter_data, "not_in", None)
+        if not_in_value is not None:
+            query_builder = query_builder.where_not_in(column, not_in_value)
+        is_null_value = getattr(filter_data, "is_null", None)
+        if is_null_value is not None and is_null_value:
             query_builder = query_builder.where_is_null(column)
-        if (
-            hasattr(filter_data, "is_not_null")
-            and filter_data.is_not_null is not None
-            and filter_data.is_not_null
-        ):
+        is_not_null_value = getattr(filter_data, "is_not_null", None)
+        if is_not_null_value is not None and is_not_null_value:
             query_builder = query_builder.where_is_not_null(column)
         return query_builder
 
@@ -260,7 +258,7 @@ class FilterApplier:
         self,
         query_builder: SupportsFiltering,
         column: Any,
-        filter_data: BaseNumberFilter,
+        filter_data: BaseNumberFilter[Any],
     ) -> SupportsFiltering:
         """
         Применить базовый числовой фильтр
@@ -283,7 +281,7 @@ class FilterApplier:
         self,
         query_builder: SupportsFiltering,
         column: Any,
-        filter_data: BaseDateTimeFilter,
+        filter_data: BaseDateTimeFilter[Any],
     ) -> SupportsFiltering:
         """
         Применить базовый фильтр даты/времени
@@ -321,7 +319,10 @@ class FilterApplier:
         return query_builder
 
     def apply_enum_filter(
-        self, query_builder: SupportsFiltering, column: Any, filter_data: EnumFilter
+        self,
+        query_builder: SupportsFiltering,
+        column: Any,
+        filter_data: EnumFilter[Any],
     ) -> SupportsFiltering:
         """
         Применить enum фильтр
@@ -338,7 +339,7 @@ class FilterApplier:
         return self._apply_common_ops(query_builder, column, filter_data)
 
     @staticmethod
-    def _get_sa_enum_type(column: InstrumentedAttribute | Any) -> sa.Enum | None:
+    def _get_sa_enum_type(column: InstrumentedAttribute[Any] | Any) -> sa.Enum | None:
         col_type = getattr(column, "type", None)
         return col_type if isinstance(col_type, sa.Enum) else None
 
@@ -373,7 +374,9 @@ class FilterApplier:
         raise ValueError(f"Unsupported enum filter value type: {type(value).__name__}")
 
     @classmethod
-    def _coerce_enum_filter_values(cls, column: Any, filt: EnumFilter) -> EnumFilter:
+    def _coerce_enum_filter_values(
+        cls, column: Any, filt: EnumFilter[Any]
+    ) -> EnumFilter[Any]:
         sa_enum = cls._get_sa_enum_type(column)
         if not sa_enum:
             return filt
@@ -471,7 +474,7 @@ class FilterApplier:
         self,
         query_builder: SupportsFiltering,
         model: type,
-        filterable_fields: DPFilters,
+        filterable_fields: DPFilters[Any],
     ) -> SupportsFiltering:
         """
         Применить все фильтры из схемы автоматически

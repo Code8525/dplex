@@ -953,7 +953,7 @@ class WordsFilter:
 
     def __str__(self) -> str:
         """Человекочитаемое представление"""
-        if self.columns is None or self.text is None or not self.text:
+        if self.columns is None or not self.text:
             return "WordsFilter(inactive)"
         if self.words:
             return f"WordsFilter({len(self.words)} words: {', '.join(self.words)} in {len(self.columns)} columns)"
