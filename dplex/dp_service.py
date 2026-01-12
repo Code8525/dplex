@@ -87,7 +87,7 @@ class DPService[
         Returns:
             Новый экземпляр SQLAlchemy модели
         """
-        return self.repository.model(**schema.model_dump(exclude_unset=True))
+        return self.repository.model(**schema.model_dump(exclude_unset=False))
 
     def _apply_filter_to_query(
         self, query_builder: "QueryBuilder[ModelType]", filter_data: FilterSchemaType
