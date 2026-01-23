@@ -351,14 +351,9 @@ class DPRepo[ModelType, KeyType]:
 
         Returns:
             Список созданных экземпляров модели
-
-        Raises:
-            ValueError: Если список entities пустой
         """
         if not entities:
-            raise ValueError(
-                "DPRepo.create_bulk: Список для создания не может быть пустым"
-            )
+            return []
 
         self.session.add_all(entities)
         return entities

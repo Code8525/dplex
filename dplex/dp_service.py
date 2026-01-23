@@ -523,9 +523,7 @@ class DPService[
             Список схем ответа с созданными сущностями
         """
         if not create_data_list:
-            raise ValueError(
-                "DPService.create_bulk: Список для создания не может быть пустым"
-            )
+            return []
 
         models = [self._create_schema_to_model(data) for data in create_data_list]
         created_models = await self.repository.create_bulk(models)
