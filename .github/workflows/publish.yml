@@ -14,12 +14,13 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install Poetry
-        run: pip install poetry
+      - uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: false
       - name: Build
         run: poetry build
       - name: Publish to PyPI
