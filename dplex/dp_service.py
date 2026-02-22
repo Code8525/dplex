@@ -410,14 +410,12 @@ class DPService[
         return [self._model_to_schema(model) for model in models]
 
     # ==================== CRUD ОПЕРАЦИИ ====================
-    async def get_by_id(self, entity_id: KeyType) -> ResponseSchemaType | None:
+    async def get_by_id(self, entity_id: KeyType | None) -> ResponseSchemaType | None:
         """
         Получить сущность по ID
-        Args:
-            entity_id: Первичный ключ
-        Returns:
-            Схема ответа или None если не найдено
         """
+        if entity_id is None:
+            return None
         model = await self.repository.find_by_id(entity_id)
         if model is None:
             return None

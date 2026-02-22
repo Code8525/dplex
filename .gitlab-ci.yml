@@ -1,0 +1,51 @@
+# Публикация в PyPI через Trusted Publisher (OIDC, без долгоживущих токенов).
+# В настройках проекта на PyPI должен быть добавлен доверенный издатель GitLab:
+#   Namespace: Code8525 (или ваш namespace)
+#   Project: dplex
+#   Top-level pipeline: .gitlab-ci.yml
+
+stages:
+  - build
+  - deploy
+
+variables:
+  PYTHON_VERSION: "3.11"
+
+# Сборка пакета
+build:
+  stage: build
+  image: python:${PYTHON_VERSION}-bookworm
+  script:
+    - pip install --no-cache-dir poetry
+    - poetry build
+  artifacts:
+    paths:
+      - dist/
+
+# Публикация в PyPI по тегу (например v0.2.3)
+publish-pypi:
+  stage: deploy
+  image: python:${PYTHON_VERSION}-bookworm
+  dependencies:
+    - build
+  id_tokens:
+    PYPI_ID_TOKEN:
+      aud: pypi
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  script:
+    - pip install --no-cache-dir twine
+    # Обмен OIDC-токена GitLab на краткосрочный API-токен PyPI
+    - |
+      resp=$(curl -s -X POST "https://pypi.org/_/oidc/mint-token" \
+        -H "Content-Type: application/json" \
+        -d "{\"token\": \"${PYPI_ID_TOKEN}\"}")
+      publish_token=$(echo "$resp" | python -c "import json,sys; print(json.load(sys.stdin).get('token',''))")
+      if [ -z "$publish_token" ]; then
+        echo "Failed to mint PyPI token. Check PyPI trusted publisher and pipeline path."
+        exit 1
+      fi
+      TWINE_USERNAME=__token__ TWINE_PASSWORD="$publish_token" twine upload dist/*
+  environment:
+    name: pypi
+    url: https://pypi.org/project/dplex/
