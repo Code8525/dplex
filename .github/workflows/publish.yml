@@ -7,8 +7,11 @@ on:
       - master
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
+    environment: выпуск
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -19,20 +22,5 @@ jobs:
         run: pip install poetry
       - name: Build
         run: poetry build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: выпуск
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
