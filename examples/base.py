@@ -135,6 +135,13 @@ async def example_flow(session: AsyncSession) -> None:
     )  # возьмём как 'u' для дальнейших операций
     print("✓ Users created")
 
+    # ---- Read #0: все записи без параметров (get_all/count без filter_data)
+    all_users = await service.get_all()
+    total_count = await service.count()
+    print(f"\nВсе записи (без фильтров): {total_count} шт.")
+    for it in all_users:
+        print(f"  {it.name:10s} | {it.email or '-':20s}")
+
     # ---- Read #1: ЯВНАЯ сортировка по ИМЕНИ (ASC), затем по ДАТЕ СОЗДАНИЯ (DESC, nulls last)
     users_by_name_then_created = await service.get_all(
         UserFilters(
@@ -183,8 +190,16 @@ async def example_flow(session: AsyncSession) -> None:
 
     # ---- Exists / Count
     exists = await service.exists(UserFilters(user_id=UUIDFilter(eq=u.user_id)))
-    total = await service.count(UserFilters())
-    print("\nExists?", exists, "Total:", total)
+    total = await service.count()  # без параметров — общее количество
+    total_filtered = await service.count(UserFilters())  # с пустым фильтром — то же
+    print(
+        "\nExists?",
+        exists,
+        "Total (count()):",
+        total,
+        "Total (count(UserFilters())):",
+        total_filtered,
+    )
 
     # ---- Delete
     deleted = await service.delete_by_id(u.user_id)

@@ -435,17 +435,21 @@ class DPService[
         models = await self.repository.find_by_ids(entity_ids)
         return self._models_to_schemas(models)
 
-    async def get_all(self, filter_data: FilterSchemaType) -> list[ResponseSchemaType]:
+    async def get_all(
+        self, filter_data: FilterSchemaType | None = None
+    ) -> list[ResponseSchemaType]:
         """
         Получить все сущности с фильтрацией и сортировкой
         Автоматически применяет все фильтры, сортировку, limit и offset из DPFilters.
+        Без параметров возвращает все записи.
         Args:
-            filter_data: Схема фильтра с параметрами поиска (DPFilters)
+            filter_data: Схема фильтра с параметрами поиска (DPFilters) или None для всех записей
         Returns:
             Список схем ответа
         """
         query_builder = self.repository.query()
-        query_builder = self._apply_base_filters(query_builder, filter_data)
+        if filter_data is not None:
+            query_builder = self._apply_base_filters(query_builder, filter_data)
         models = await query_builder.find_all()
         return self._models_to_schemas(models)
 
@@ -464,16 +468,18 @@ class DPService[
         results = await self.get_all(first_filter)
         return results[0] if results else None
 
-    async def count(self, filter_data: FilterSchemaType) -> int:
+    async def count(self, filter_data: FilterSchemaType | None = None) -> int:
         """
         Подсчитать количество сущностей с фильтрацией
+        Без параметров возвращает общее количество записей.
         Args:
-            filter_data: Схема фильтра
+            filter_data: Схема фильтра или None для подсчёта всех записей
         Returns:
             Количество записей
         """
         query_builder = self.repository.query()
-        query_builder = self._apply_filter_to_query(query_builder, filter_data)
+        if filter_data is not None:
+            query_builder = self._apply_filter_to_query(query_builder, filter_data)
         return await query_builder.count()
 
     async def exists(self, filter_data: FilterSchemaType) -> bool:
