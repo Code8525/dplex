@@ -276,17 +276,17 @@ class DPService[
         sort: list[Sort[SortFieldSchemaType]] | Sort[SortFieldSchemaType] | None,
     ) -> list[Sort[SortFieldSchemaType]]:
         """
-        Нормализовать сортировку в список
+        Нормализовать сортировку в список.
+        Элементы Sort с by=None отфильтровываются — сортировка по ним не применяется.
         Args:
             sort: Один элемент Sort, список Sort или None
         Returns:
-            Список элементов сортировки (может быть пустым)
+            Список элементов сортировки с заданным полем (может быть пустым)
         """
         if sort is None:
             return []
-        if isinstance(sort, list):
-            return sort
-        return [sort]
+        items = sort if isinstance(sort, list) else [sort]
+        return [s for s in items if s.by is not None]
 
     def _apply_sort_to_query(
         self,
@@ -302,6 +302,8 @@ class DPService[
             QueryBuilder с примененной сортировкой
         """
         for sort_item in sort_list:
+            if sort_item.by is None:
+                continue
             column_name = self._sort_field_to_column_name(sort_item.by)
             column = self._get_model_column(column_name)
             desc_order = sort_item.order == Order.DESC

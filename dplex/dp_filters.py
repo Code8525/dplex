@@ -235,12 +235,17 @@ class DPFilters[SortFieldType](BaseModel):
 
     def has_sort(self) -> bool:
         """
-        Проверить, установлены ли параметры сортировки
+        Проверить, установлены ли параметры сортировки.
 
         Returns:
-            True если установлена сортировка, иначе False
+            True если есть хотя бы одно правило Sort с заданным полем (by is not None), иначе False.
+            Sort(by=None) не считается активной сортировкой.
         """
-        return self.sort is not None
+        if self.sort is None:
+            return False
+        if isinstance(self.sort, list):
+            return any(s.by is not None for s in self.sort)
+        return self.sort.by is not None
 
     def __repr__(self) -> str:
         """
@@ -299,7 +304,12 @@ class DPFilters[SortFieldType](BaseModel):
             parts.append(f"{count} active filters")
 
         if self.has_sort():
-            sort_count = len(self.sort) if isinstance(self.sort, list) else 1
+            if isinstance(self.sort, list):
+                items = self.sort
+            else:
+                assert self.sort is not None  # has_sort() guarantees this
+                items = [self.sort]
+            sort_count = len([s for s in items if s.by is not None])
             parts.append(f"{sort_count} sort rule(s)")
 
         if self.has_pagination():

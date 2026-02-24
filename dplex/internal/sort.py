@@ -65,7 +65,7 @@ class Sort[SortByType]:
         SortByType: Тип поля для сортировки (обычно str или Enum)
 
     Attributes:
-        by: Поле для сортировки
+        by: Поле для сортировки; если None — сортировка не применяется (удобно для запросов с опциональным sort_by)
         order: Направление сортировки (по умолчанию ASC)
         nulls: Размещение NULL значений (по умолчанию None - поведение СУБД)
 
@@ -73,8 +73,9 @@ class Sort[SortByType]:
     Notes:
         - Класс immutable (frozen=True) для безопасного использования в хешируемых структурах
         - Параметр nulls опционален - если None, используется поведение СУБД по умолчанию
+        - При by=None правило сортировки игнорируется (можно передавать Sort(by=request.sort_by, order=...) при опциональном sort_by)
     """
 
-    by: SortByType
+    by: SortByType | None = None
     order: Order = Order.ASC
     nulls: NullsPlacement | None = None
