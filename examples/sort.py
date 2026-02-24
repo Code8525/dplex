@@ -4,6 +4,7 @@
 Показывает:
 - Обычную сортировку по полю (Sort(by=..., order=...))
 - Опциональный sort_by: Sort(by=request.sort_by, order=...) — при sort_by=None сортировка не применяется
+- Опциональный sort_by с отдельным enum в API: filters.add_sort_from_value(api_sort_by, order)
 - Множественную сортировку и NullsPlacement
 """
 
@@ -124,6 +125,43 @@ def request_to_filters(request: QueryRequest) -> UserFilters:
     )
 
 
+# ===================== Эмуляция API-запроса (api enum как подмножество доменного) =====================
+class ApiUserSortBy(StrEnum):
+    """
+    Поля сортировки на уровне API.
+
+    Часто в API хочется разрешить сортировку только по части полей доменной модели.
+    В dplex сортировка далее использует `sort_field.value`, поэтому можно передавать StrEnum напрямую.
+    """
+
+    NAME = "name"
+    CREATED_AT = "created_at"
+
+
+class QueryRequestApiSortBy(BaseModel):
+    """Запрос списка, где sort_by типизирован отдельным API enum."""
+
+    sort: Order = Field(default=Order.DESC, description="Направление сортировки")
+    sort_by: ApiUserSortBy | None = Field(
+        default=None,
+        description="Поле сортировки; если не указано — сортировка не применяется",
+    )
+    limit: int | None = Field(default=10, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
+def request_to_filters_from_value(request: QueryRequestApiSortBy) -> UserFilters:
+    """
+    Преобразование API-запроса в фильтры dplex, когда sort_by — отдельный enum.
+
+    Создаём фильтры и добавляем сортировку методом экземпляра:
+    `filters.add_sort_from_value(request.sort_by, request.sort)`.
+    """
+    filters = UserFilters(limit=request.limit, offset=request.offset)
+    filters.add_sort_from_value(request.sort_by, request.sort)
+    return filters
+
+
 # ===================== Примеры =====================
 async def example_basic_sort(service: UserService) -> None:
     """Обычная сортировка по одному полю."""
@@ -224,6 +262,32 @@ async def example_single_sort_with_by_none(service: UserService) -> None:
     print(f"  Записей: {len(users)} (без сортировки)")
 
 
+async def example_from_value_api_enum_subset(service: UserService) -> None:
+    """
+    Пример `filters.add_sort_from_value()`:
+
+    - В API используется отдельный enum (подмножество доменного).
+    - sort_by опционален, при None сортировка не применяется.
+    """
+    print("\n--- add_sort_from_value(): API enum как подмножество доменного ---")
+    request = QueryRequestApiSortBy(
+        sort_by=ApiUserSortBy.CREATED_AT,
+        sort=Order.DESC,
+        limit=5,
+    )
+    filters = request_to_filters_from_value(request)
+    print(f"  has_sort() = {filters.has_sort()}")
+    # Для вывода: sort может быть одним Sort или списком
+    if filters.sort is not None:
+        first = filters.sort[0] if isinstance(filters.sort, list) else filters.sort
+        by_value = first.by.value if first.by is not None else None
+        print(f"  sort.by = {first.by} (value={by_value})")
+
+    users = await service.get_all(filters)
+    for u in users:
+        print(f"  {u.name} | {u.created_at}")
+
+
 async def init_db(engine) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -237,6 +301,7 @@ async def run_all(service: UserService) -> None:
     await example_optional_sort_by_no_field(service)
     await example_optional_sort_by_with_field(service)
     await example_single_sort_with_by_none(service)
+    await example_from_value_api_enum_subset(service)
 
 
 async def main() -> None:

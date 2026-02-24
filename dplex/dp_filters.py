@@ -1,10 +1,11 @@
 """Базовая схема для работы с фильтрами, сортировкой и пагинацией"""
 
-from typing import Any, TypeVar
+from enum import StrEnum
+from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dplex.internal.sort import Sort
+from dplex.internal.sort import NullsPlacement, Order, Sort
 
 # Generic тип для поля сортировки
 SortFieldType = TypeVar("SortFieldType")
@@ -80,6 +81,41 @@ class DPFilters[SortFieldType](BaseModel):
         extra="forbid",
         frozen=False,
     )
+
+    def add_sort_from_value(
+        self,
+        sort_by: StrEnum | None,
+        order: Order = Order.ASC,
+        nulls: NullsPlacement | None = None,
+    ) -> "DPFilters[SortFieldType]":
+        """
+        Добавить правило сортировки из значения запроса (enum или None).
+
+        Если sort_by is None — ничего не добавляет (удобно для опционального sort_by в API).
+        В dplex далее используется sort_field.value, поэтому ожидается StrEnum. Удобно, когда
+        в API используется отдельный enum как подмножество доменного — можно передать его
+        напрямую, тип Sort зафиксирован схемой фильтров.
+
+        Returns:
+            self для цепочки вызовов.
+
+        Пример:
+            filters = UserFilters(limit=10, offset=0)
+            filters.add_sort_from_value(request.sort_by, request.sort)
+        """
+        if sort_by is None:
+            return self
+        new_sort = cast(
+            Sort[SortFieldType],
+            Sort(by=cast(Any, sort_by), order=order, nulls=nulls),
+        )
+        if self.sort is None:
+            self.sort = new_sort
+        elif isinstance(self.sort, list):
+            self.sort = [*self.sort, new_sort]
+        else:
+            self.sort = [self.sort, new_sort]
+        return self
 
     def get_active_filters(self) -> dict[str, Any]:
         """
