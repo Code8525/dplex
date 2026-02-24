@@ -1,10 +1,14 @@
 """
 Примеры сортировки в dplex.
 
+Разделение схем:
+- Доменная схема: UserSortField, UserFilters — используются внутри приложения (сервис, DPFilters).
+- API-схема: QueryRequest / QueryRequestApiSortBy — то, что приходит с клиента (query-параметры).
+
 Показывает:
 - Обычную сортировку по полю (Sort(by=..., order=...))
-- Опциональный sort_by: Sort(by=request.sort_by, order=...) — при sort_by=None сортировка не применяется
-- Опциональный sort_by с отдельным enum в API: filters.add_sort_from_value(api_sort_by, order)
+- Опциональный sort_by: при sort_by=None сортировка не применяется
+- API-схема с подмножеством полей: свой enum (ApiUserSortBy) → filters.add_sort(api_sort_by, order) в доменные фильтры
 - Множественную сортировку и NullsPlacement
 """
 
@@ -57,9 +61,13 @@ class UserResponse(BaseModel):
     created_at: datetime
 
 
-# ===================== Сортировка и фильтры =====================
+# ===================== Доменная схема (сортировка и фильтры) =====================
+# Используется внутри приложения: сервис, репозиторий, DPFilters.
+# Enum задаёт все поля модели, по которым разрешена сортировка в домене.
+
+
 class UserSortField(StrEnum):
-    """Поля для сортировки."""
+    """Доменные поля сортировки — все поля User, по которым можно сортировать."""
 
     ID = "id"
     NAME = "name"
@@ -68,7 +76,7 @@ class UserSortField(StrEnum):
 
 
 class UserFilters(DPFilters[UserSortField]):
-    """Фильтры пользователей (в примерах используем в основном sort/limit/offset)."""
+    """Доменная схема фильтров: тип сортировки зафиксирован как UserSortField."""
 
     name: StringFilter | None = None
 
@@ -93,9 +101,12 @@ class UserService(
         super().__init__(repository=repo, session=session, response_schema=UserResponse)
 
 
-# ===================== Эмуляция API-запроса (опциональный sort_by) =====================
+# ===================== API-схема: запрос с тем же enum, что и домен =====================
+# Когда в API принимается тот же enum, что и в домене (UserSortField), маппинг не нужен.
+
+
 class QueryRequest(BaseModel):
-    """Базовый запрос списка с опциональной сортировкой (как в типовом API)."""
+    """Схема запроса API: sort_by совпадает с доменным UserSortField."""
 
     sort: Order = Field(default=Order.DESC, description="Направление сортировки")
     sort_by: UserSortField | None = Field(
@@ -125,13 +136,17 @@ def request_to_filters(request: QueryRequest) -> UserFilters:
     )
 
 
-# ===================== Эмуляция API-запроса (api enum как подмножество доменного) =====================
+# ===================== API-схема: свой enum (подмножество доменного) =====================
+# В API часто разрешают сортировать только по части полей. Отдельный enum для запроса,
+# значения (.value) совпадают с доменным — тогда add_sort(api_sort_by, ...) передаёт в доменные фильтры.
+
+
 class ApiUserSortBy(StrEnum):
     """
-    Поля сортировки на уровне API.
+    API-схема полей сортировки — подмножество доменного UserSortField.
 
-    Часто в API хочется разрешить сортировку только по части полей доменной модели.
-    В dplex сортировка далее использует `sort_field.value`, поэтому можно передавать StrEnum напрямую.
+    В запросе клиента разрешены только NAME и CREATED_AT. Значения совпадают с доменом,
+    поэтому в add_sort() можно передать этот enum напрямую.
     """
 
     NAME = "name"
@@ -139,7 +154,7 @@ class ApiUserSortBy(StrEnum):
 
 
 class QueryRequestApiSortBy(BaseModel):
-    """Запрос списка, где sort_by типизирован отдельным API enum."""
+    """Схема запроса API: sort_by типизирован API-enum (не доменным)."""
 
     sort: Order = Field(default=Order.DESC, description="Направление сортировки")
     sort_by: ApiUserSortBy | None = Field(
@@ -152,13 +167,13 @@ class QueryRequestApiSortBy(BaseModel):
 
 def request_to_filters_from_value(request: QueryRequestApiSortBy) -> UserFilters:
     """
-    Преобразование API-запроса в фильтры dplex, когда sort_by — отдельный enum.
+    API-схема → доменные фильтры: sort_by приходит как ApiUserSortBy, фильтры ждут UserSortField.
 
-    Создаём фильтры и добавляем сортировку методом экземпляра:
-    `filters.add_sort_from_value(request.sort_by, request.sort)`.
+    add_sort() принимает любой StrEnum с подходящим .value; тип Sort[UserSortField] задаётся
+    доменной схемой UserFilters.
     """
     filters = UserFilters(limit=request.limit, offset=request.offset)
-    filters.add_sort_from_value(request.sort_by, request.sort)
+    filters.add_sort(request.sort_by, request.sort)
     return filters
 
 
@@ -264,24 +279,24 @@ async def example_single_sort_with_by_none(service: UserService) -> None:
 
 async def example_from_value_api_enum_subset(service: UserService) -> None:
     """
-    Пример `filters.add_sort_from_value()`:
+    Пример add_sort(): API-схема (ApiUserSortBy) → доменные фильтры (UserFilters с UserSortField).
 
-    - В API используется отдельный enum (подмножество доменного).
-    - sort_by опционален, при None сортировка не применяется.
+    В запросе приходит enum из API-схемы; добавляем сортировку в доменные фильтры без явного маппинга.
     """
-    print("\n--- add_sort_from_value(): API enum как подмножество доменного ---")
+    print("\n--- add_sort(): API-схема → доменные фильтры ---")
     request = QueryRequestApiSortBy(
-        sort_by=ApiUserSortBy.CREATED_AT,
+        sort_by=ApiUserSortBy.NAME,
         sort=Order.DESC,
         limit=5,
     )
     filters = request_to_filters_from_value(request)
+
+    filters.add_sort(
+        request.sort_by,
+        request.sort,
+    )
+
     print(f"  has_sort() = {filters.has_sort()}")
-    # Для вывода: sort может быть одним Sort или списком
-    if filters.sort is not None:
-        first = filters.sort[0] if isinstance(filters.sort, list) else filters.sort
-        by_value = first.by.value if first.by is not None else None
-        print(f"  sort.by = {first.by} (value={by_value})")
 
     users = await service.get_all(filters)
     for u in users:

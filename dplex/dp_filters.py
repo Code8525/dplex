@@ -82,7 +82,7 @@ class DPFilters[SortFieldType](BaseModel):
         frozen=False,
     )
 
-    def add_sort_from_value(
+    def add_sort(
         self,
         sort_by: StrEnum | None,
         order: Order = Order.ASC,
@@ -101,7 +101,7 @@ class DPFilters[SortFieldType](BaseModel):
 
         Пример:
             filters = UserFilters(limit=10, offset=0)
-            filters.add_sort_from_value(request.sort_by, request.sort)
+            filters.add_sort(request.sort_by, request.sort)
         """
         if sort_by is None:
             return self
