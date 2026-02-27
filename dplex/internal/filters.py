@@ -873,30 +873,30 @@ class WordsFilter:
     Фильтр для поиска по нескольким словам с автоматической разбивкой строки
 
     Автоматически разбивает строку на слова и предоставляет их для поиска.
-    Предназначен для кастомных фильтров, где нужно искать каждое слово
-    в разных колонках модели.
+    Поддерживает два режима:
+    - columns задан: поиск в указанных колонках (для кастомных полей вроде query)
+    - columns=None: поиск в колонке текущего поля схемы (имя поля = имя колонки модели).
+      Если поле отсутствует в модели, при применении фильтра выбрасывается ValueError.
 
     Args:
         text: Строка для поиска, которая будет автоматически разбита на слова.
-              Если None, фильтр не будет применяться.
+              Если None или пустая, фильтр не применяется.
         columns: Список колонок модели для поиска.
-                 Если None, фильтр не будет применяться.
+                 Если None, используется колонка текущего поля (где WordsFilter в схеме).
 
     Examples:
-        >>> # Использование с указанием колонок
-        >>> words_filter = WordsFilter("john developer", columns=[User.name, User.email, User.bio])
-        >>> # words_filter.words = ["john", "developer"]
+        >>> # Поиск по текущему полю (name в схеме -> User.name в модели)
+        >>> class UserFilters(DPFilters):
+        ...     name: WordsFilter | None = None
+        >>> filters = UserFilters(name=WordsFilter("john"))  # поиск в User.name
         >>>
-        >>> # В схеме фильтрации
+        >>> # Поиск в нескольких колонках (кастомное поле query)
         >>> class UserFilters(DPFilters):
         ...     query: WordsFilter | None = None
+        >>> filters = UserFilters(query=WordsFilter("john dev", columns=[User.name, User.email, User.bio]))
         >>>
-        >>> filters = UserFilters(query=WordsFilter("python developer", columns=[User.name, User.email]))
-        >>>
-        >>> # Упрощенное использование: если text или columns равны None, фильтр не применяется
-        >>> filters = UserFilters(query=WordsFilter(None, None))  # фильтр не будет применен
-        >>> filters = UserFilters(query=WordsFilter("text", None))  # фильтр не будет применен
-        >>> filters = UserFilters(query=WordsFilter(None, [User.name]))  # фильтр не будет применен
+        >>> # Не применяется при пустом text
+        >>> filters = UserFilters(name=WordsFilter(None))  # фильтр не будет применен
     """
 
     def __init__(
@@ -907,9 +907,10 @@ class WordsFilter:
 
         Args:
             text: Строка для поиска, которая будет автоматически разбита на слова.
-                  Если None, фильтр не будет применяться.
+                  Если None, фильтр не применяется.
             columns: Список колонок модели для поиска.
-                     Если None, фильтр не будет применяться.
+                     Если None, используется колонка текущего поля (при применении).
+                     Поле должно существовать в модели, иначе ValueError.
 
         Returns:
             None
@@ -953,8 +954,10 @@ class WordsFilter:
 
     def __str__(self) -> str:
         """Человекочитаемое представление"""
-        if self.columns is None or not self.text:
+        if not self.text:
             return "WordsFilter(inactive)"
         if self.words:
-            return f"WordsFilter({len(self.words)} words: {', '.join(self.words)} in {len(self.columns)} columns)"
+            if self.columns:
+                return f"WordsFilter({len(self.words)} words: {', '.join(self.words)} in {len(self.columns)} columns)"
+            return f"WordsFilter({len(self.words)} words: {', '.join(self.words)} in current field)"
         return "WordsFilter(empty)"

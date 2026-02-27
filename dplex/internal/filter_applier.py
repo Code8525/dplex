@@ -419,6 +419,9 @@ class FilterApplier:
         self,
         query_builder: SupportsFiltering,
         filter_data: WordsFilter,
+        *,
+        model: type | None = None,
+        field_name: str | None = None,
     ) -> SupportsFiltering:
         """
         Применить фильтр слов к нескольким колонкам
@@ -427,36 +430,40 @@ class FilterApplier:
         Для каждого слова создается условие OR (слово должно быть найдено хотя бы в одной колонке).
         Все слова объединяются через AND (все слова должны быть найдены).
 
-        Если filter_data.text или filter_data.columns равны None, фильтр не применяется.
+        Если filter_data.columns равен None, используются колонка текущего поля (model, field_name).
+        При отсутствии поля в модели выбрасывается ValueError.
+
+        Если filter_data.text пустой, фильтр не применяется.
 
         Args:
             query_builder: Query builder для применения фильтров
-            filter_data: Экземпляр WordsFilter с указанными колонками
+            filter_data: Экземпляр WordsFilter
+            model: Модель для разрешения колонки по имени поля (при columns=None)
+            field_name: Имя поля для поиска (при columns=None)
 
         Returns:
             Query builder с примененным фильтром слов (или без изменений, если фильтр не активен)
 
-        Examples:
-            >>> from sqlalchemy import and_, or_
-            >>> words_filter = WordsFilter("john developer", columns=[User.name, User.email])
-            >>> query = applier.apply_words_filter(query_builder, words_filter)
-            >>>
-            >>> # Фильтр не будет применен, если text или columns равны None
-            >>> inactive_filter = WordsFilter(None, None)
-            >>> query = applier.apply_words_filter(query_builder, inactive_filter)  # вернет query без изменений
+        Raises:
+            ValueError: Если columns=None, field_name не задан или поле отсутствует в модели
         """
         from sqlalchemy import and_, or_
 
-        search_columns = filter_data.columns
-
-        # Если columns равны None или пустые, фильтр не применяется
-        if search_columns is None or not search_columns:
-            return query_builder
-
         words = filter_data.words
-        # Если words пустые (text был None или пустой), фильтр не применяется
+        # Если text пустой — фильтр не применяется (не проверяем columns)
         if not words:
             return query_builder
+
+        search_columns = filter_data.columns
+        # Если columns заданы — используем их; иначе — колонку текущего поля
+        if search_columns is None or not search_columns:
+            if model is None or field_name is None:
+                return query_builder
+            if not hasattr(model, field_name):
+                raise ValueError(
+                    f"WordsFilter: модель {model.__name__} не имеет поля '{field_name}'"
+                )
+            search_columns = [getattr(model, field_name)]
 
         # Для каждого слова создаем условие: слово должно быть найдено хотя бы в одной колонке (OR)
         word_conditions = []
@@ -516,8 +523,9 @@ class FilterApplier:
 
             # Обрабатываем WordsFilter отдельно (может быть кастомным фильтром)
             if isinstance(field_value, WordsFilter):
-                # WordsFilter теперь всегда имеет колонки (обязательный параметр)
-                query_builder = self.apply_words_filter(query_builder, field_value)
+                query_builder = self.apply_words_filter(
+                    query_builder, field_value, model=model, field_name=field_name
+                )
                 continue
 
             # Пропускаем поля, отсутствующие в модели

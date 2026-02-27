@@ -12,7 +12,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import Integer, String
+from sqlalchemy import Integer, String, event
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -29,6 +29,12 @@ class Base(DeclarativeBase):
     pass
 
 
+def _user_text_search(user: "User") -> str:
+    """Собрать text_search из name и email"""
+    parts = [user.name or "", user.email or ""]
+    return " ".join(p.strip() for p in parts if p.strip())
+
+
 class User(Base):
     """Модель пользователя"""
 
@@ -39,7 +45,14 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     age: Mapped[int] = mapped_column(Integer)
     bio: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    text_search: Mapped[str] = mapped_column(String(400), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(insert_default=datetime.now)
+
+
+@event.listens_for(User, "before_insert")
+@event.listens_for(User, "before_update")
+def _set_user_text_search(_mapper, _connection, target: User) -> None:
+    target.text_search = _user_text_search(target)
 
 
 # Enum для сортировки
@@ -50,6 +63,7 @@ class UserSortField(StrEnum):
     NAME = "name"
     EMAIL = "email"
     AGE = "age"
+    TEXT_SEARCH = "text_search"
     CREATED_AT = "created_at"
 
 
@@ -71,6 +85,7 @@ class UserResponse(BaseModel):
     email: str | None
     age: int
     bio: str | None
+    text_search: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -97,6 +112,8 @@ class UserFilters(DPFilters[UserSortField]):
     # Колонки для поиска указываются при создании фильтра
     # Если text или columns равны None, фильтр не применяется
     query: WordsFilter | None = None
+    # Поиск по text_search (колонка заполняется из name и email)
+    text_search: WordsFilter | None = None
 
 
 # Сервис с обработкой кастомного фильтра
@@ -150,6 +167,23 @@ async def example_word_filter_basic(service: UserService) -> None:
         print(f"  - {user.name} ({user.email}) - {user.bio}")
 
 
+async def example_text_search(service: UserService) -> None:
+    """
+    Пример: Поле text_search (заполняется из name и email)
+
+    Поиск по колонке text_search, columns не нужны — поле есть в модели.
+    """
+    print("\n=== WORDS FILTER: Поле text_search ===")
+
+    filters = UserFilters(text_search=WordsFilter("john"))
+    users = await service.get_all(filters)
+    print(
+        f"✓ text_search='john' (поиск в name+email): найдено {len(users)} пользователей"
+    )
+    for user in users:
+        print(f"  - {user.name} ({user.email}) - {user.bio}")
+
+
 async def example_word_filter_with_none(service: UserService) -> None:
     """
     Пример: Использование WordsFilter с None
@@ -172,14 +206,6 @@ async def example_word_filter_with_none(service: UserService) -> None:
     filters = UserFilters(
         query=WordsFilter(None, columns=[User.name, User.email, User.bio])
     )
-    users = await service.get_all(filters)
-    print(f"✓ Найдено всех пользователей: {len(users)}")
-    for user in users:
-        print(f"  - {user.name} ({user.email})")
-
-    # Все пользователи (фильтр не применяется, так как columns=None)
-    print("\n3. Фильтр с text указан, но columns=None (фильтр не применяется):")
-    filters = UserFilters(query=WordsFilter("john", None))
     users = await service.get_all(filters)
     print(f"✓ Найдено всех пользователей: {len(users)}")
     for user in users:
@@ -379,6 +405,7 @@ async def run_examples() -> None:
 
         # Запускаем примеры
         await example_word_filter_basic(service)
+        await example_text_search(service)
         await example_word_filter_with_none(service)
         await example_word_filter_combined(service)
         await example_word_filter_multiple_words(service)
