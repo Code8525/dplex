@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dplex.dp_filters import DPFilters
 from dplex.dp_repo import DPRepo
+from dplex.exceptions import EntityNotFoundError
 from dplex.internal.filter_applier import FilterApplier
 
 if TYPE_CHECKING:
@@ -421,6 +422,19 @@ class DPService[
         model = await self.repository.find_by_id(entity_id)
         if model is None:
             return None
+        return self._model_to_schema(model)
+
+    async def get_by_id_or_raise(self, entity_id: KeyType | None) -> ResponseSchemaType:
+        """
+        Получить сущность по ID или выбросить исключение, если ID не задан или сущность не найдена.
+        """
+        model = (
+            await self.repository.find_by_id(entity_id)
+            if entity_id is not None
+            else None
+        )
+        if model is None:
+            raise EntityNotFoundError(self.repository.model.__name__, entity_id)
         return self._model_to_schema(model)
 
     async def get_by_ids(self, entity_ids: list[KeyType]) -> list[ResponseSchemaType]:
