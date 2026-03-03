@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import ColumnElement, and_, delete, func, select, update
+from sqlalchemy import ColumnElement, and_, delete, exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -316,7 +316,9 @@ class DPRepo[ModelType, KeyType]:
 
     async def exists_by_id(self, entity_id: KeyType) -> bool:
         """
-        Проверить существование сущности по ID
+        Проверить существование сущности по ID.
+
+        Использует EXISTS — минимальная выборка, без загрузки строки.
 
         Args:
             entity_id: ID сущности
@@ -324,8 +326,9 @@ class DPRepo[ModelType, KeyType]:
         Returns:
             True если сущность существует, иначе False
         """
-        count = await self.query().where(self.id_eq(entity_id)).count()
-        return count > 0
+        stmt = select(exists().where(self._id_column == entity_id))
+        result = await self.session.execute(stmt)
+        return result.scalar() is True
 
     async def create(self, entity: ModelType) -> ModelType:
         """
