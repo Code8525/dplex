@@ -431,6 +431,30 @@ class DPService[
         """
         ...
 
+    async def transform_create_schema(
+        self, create_data: CreateSchemaType
+    ) -> CreateSchemaType:
+        """
+        Преобразование схемы создания перед сохранением.
+        Вызывается до валидации и преобразования в модель.
+        Переопределите в наследниках для нормализации данных
+        (trim полей, приведение регистра, подстановка значений и т.п.).
+        Возвращает схему (новый экземпляр или изменённую копию).
+        """
+        return create_data
+
+    async def transform_update_schema(
+        self, update_data: UpdateSchemaType
+    ) -> UpdateSchemaType:
+        """
+        Преобразование схемы обновления перед применением.
+        Вызывается до валидации и записи в БД.
+        Переопределите в наследниках для нормализации данных
+        (trim полей, приведение регистра и т.п.).
+        Возвращает схему (новый экземпляр или изменённую копию).
+        """
+        return update_data
+
     # ==================== CRUD ОПЕРАЦИИ ====================
     async def get_by_id(self, entity_id: KeyType | None) -> ResponseSchemaType | None:
         """
@@ -546,6 +570,7 @@ class DPService[
         Returns:
             Схема ответа с созданной сущностью
         """
+        create_data = await self.transform_create_schema(create_data)
         await self.validate_create(create_data)
         model = self._create_schema_to_model(create_data)
         created_model = await self.repository.create(model)
@@ -565,9 +590,12 @@ class DPService[
         if not create_data_list:
             return []
 
+        transformed_list: list[CreateSchemaType] = []
         for data in create_data_list:
+            data = await self.transform_create_schema(data)
             await self.validate_create(data)
-        models = [self._create_schema_to_model(data) for data in create_data_list]
+            transformed_list.append(data)
+        models = [self._create_schema_to_model(data) for data in transformed_list]
         created_models = await self.repository.create_bulk(models)
         await self.session.flush()
         return self._models_to_schemas(created_models)
@@ -587,6 +615,7 @@ class DPService[
         Returns:
             None
         """
+        update_data = await self.transform_update_schema(update_data)
         update_dict = self._make_update_dict(update_data)
         if not update_dict:
             raise ValueError(
@@ -612,6 +641,7 @@ class DPService[
         Returns:
             None
         """
+        update_data = await self.transform_update_schema(update_data)
         update_dict = self._make_update_dict(update_data)
         if not update_dict:
             raise ValueError(
@@ -638,6 +668,7 @@ class DPService[
         if not entity_ids:
             raise ValueError("DPService.update_by_ids: Список ID не может быть пустым")
 
+        update_data = await self.transform_update_schema(update_data)
         update_dict = self._make_update_dict(update_data)
         if not update_dict:
             raise ValueError(
