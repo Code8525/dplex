@@ -420,7 +420,7 @@ class DPService[
         Переопределите в наследниках для доменной валидации.
         При ошибке валидации выбросьте исключение.
         """
-        pass
+        ...
 
     async def validate_update(self, update_data: UpdateSchemaType) -> None:
         """
@@ -429,7 +429,7 @@ class DPService[
         Переопределите в наследниках для доменной валидации.
         При ошибке валидации выбросьте исключение.
         """
-        pass
+        ...
 
     # ==================== CRUD ОПЕРАЦИИ ====================
     async def get_by_id(self, entity_id: KeyType | None) -> ResponseSchemaType | None:
