@@ -412,6 +412,25 @@ class DPService[
         """
         return [self._model_to_schema(model) for model in models]
 
+    # ==================== ВАЛИДАЦИОННЫЕ ХУКИ ====================
+    async def validate_create(self, create_data: CreateSchemaType) -> None:
+        """
+        Валидация перед созданием сущности.
+        Вызывается до преобразования схемы в модель и сохранения.
+        Переопределите в наследниках для доменной валидации.
+        При ошибке валидации выбросьте исключение.
+        """
+        pass
+
+    async def validate_update(self, update_data: UpdateSchemaType) -> None:
+        """
+        Валидация перед обновлением сущности.
+        Вызывается до применения изменений в БД.
+        Переопределите в наследниках для доменной валидации.
+        При ошибке валидации выбросьте исключение.
+        """
+        pass
+
     # ==================== CRUD ОПЕРАЦИИ ====================
     async def get_by_id(self, entity_id: KeyType | None) -> ResponseSchemaType | None:
         """
@@ -527,6 +546,7 @@ class DPService[
         Returns:
             Схема ответа с созданной сущностью
         """
+        await self.validate_create(create_data)
         model = self._create_schema_to_model(create_data)
         created_model = await self.repository.create(model)
         await self.session.flush()
@@ -545,6 +565,8 @@ class DPService[
         if not create_data_list:
             return []
 
+        for data in create_data_list:
+            await self.validate_create(data)
         models = [self._create_schema_to_model(data) for data in create_data_list]
         created_models = await self.repository.create_bulk(models)
         await self.session.flush()
@@ -571,6 +593,7 @@ class DPService[
                 "DPService.update: Данные для обновления не могут быть пустыми"
             )
 
+        await self.validate_update(update_data)
         qb = self.repository.query()
         qb = self._apply_filter_to_query(qb, filter_data)
         await self.repository.update_by_query_builder(qb, update_dict)
@@ -595,6 +618,7 @@ class DPService[
                 "DPService.update_by_id: Данные для обновления не могут быть пустыми"
             )
 
+        await self.validate_update(update_data)
         await self.repository.update_by_id(entity_id, update_dict)
         await self.session.flush()
 
@@ -620,6 +644,7 @@ class DPService[
                 "DPService.update_by_ids: Данные для обновления не могут быть пустыми"
             )
 
+        await self.validate_update(update_data)
         await self.repository.update_by_ids(entity_ids, update_dict)
         await self.session.flush()
 
