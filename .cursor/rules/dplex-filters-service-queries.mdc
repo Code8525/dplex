@@ -1,0 +1,108 @@
+---
+description: dplex — фильтры, FilterApplier, методы DPService/Repo (домен и внешний слой)
+globs:
+  - "**/domain/**/*.py"
+  - "**/routers/**/*.py"
+  - "**/api/**/*.py"
+  - "**/routes/**/*.py"
+  - "**/workers/**/*.py"
+  - "**/worker/**/*.py"
+  - "**/tasks/**/*.py"
+  - "**/handlers/**/*.py"
+alwaysApply: false
+---
+
+# dplex: фильтры и запросы через сервис
+
+Правило для **домена** (`filter.py`, `service.py`, кастомный `repo.py`) и для **внешних точек** (роутер, worker, handler), где собирают `DPFilters` и вызывают `DPService` / при необходимости `repo.query()` + `FilterApplier`. Одна и та же механика фильтров и методов сервиса в обоих местах.
+
+## Как это связано (цепочка)
+
+1. Объявляется схема `class XxxFilters(DPFilters[SortEnum])` с полями `name: StringFilter | None = None` и т.д. Имена полей **должны совпадать** с атрибутами SQLAlchemy-модели (кроме кастомных полей — см. ниже).
+2. `DPService` при чтении (`get_all`, `get_first`, `paginate`) вызывает `_apply_base_filters`: сначала `FilterApplier.apply_filters_from_schema(qb, Model, filters)`, затем сортировку и `limit`/`offset` из `DPFilters`.
+3. `FilterApplier` для каждого **активного** поля из `get_active_filters()` (без `sort`, `limit`, `offset`) берёт колонку `getattr(Model, field_name)` и по **типу экземпляра** фильтра вызывает нужный `apply_*`.
+4. Поля, которых **нет** на модели, автоматически **пропускаются** — их нужно обработать в сервисе через переопределение `apply_custom_filters` (или не класть в схему, если логика только в сервисе).
+
+Импорты фильтров: `from dplex import StringFilter, IntFilter, ...` (см. `dplex/__init__.py`).
+
+## Запросы через DPService (типовой паттерн)
+
+Передать экземпляр `XxxFilters` в метод сервиса — фильтры, сортировка и пагинация подтягиваются из `DPFilters`:
+
+- `await service.get_all(filters)` — фильтры + `sort` + `limit`/`offset`
+- `await service.get_first(filters)` — то же, внутри принудительно `limit=1`
+- `await service.paginate(page, per_page, filters)` — `count` по фильтрам, выборка с `limit`/`offset`
+- `await service.count(filters)` — только WHERE по фильтрам (**без** сортировки и limit/offset)
+- `await service.update(filters, update_schema)` / `await service.delete(filters)` — только фильтры в WHERE (**без** sort/limit/offset)
+
+Прямой доступ к репозиторию (если нужен кастомный запрос без `DPService`):
+
+- `qb = repo.query()` → далее `FilterApplier().apply_filters_from_schema(qb, Model, filters)` → `await qb.find_all()` / `count()` и т.д.
+
+## Общие операции (где поддерживаются)
+
+Для большинства фильтров доступны комбинации (каждая заданная операция добавляет **ещё одно** AND-условие):
+
+| Операция | Смысл |
+|----------|--------|
+| `eq` | равно |
+| `ne` | не равно |
+| `in_` | IN (список) |
+| `not_in` | NOT IN |
+| `is_null=True` | IS NULL |
+| `is_not_null=True` | IS NOT NULL |
+
+`StringFilter` и числовые/датовые фильтры дополнительно поддерживают операции из таблиц ниже. Несколько полей в одной схеме объединяются через **AND**.
+
+## StringFilter
+
+- Общие: `eq`, `ne`, `in_`, `not_in`, `is_null`, `is_not_null`
+- Строковые: `like`, `ilike` (паттерн **как в SQL**, со своими `%`/`_`)
+- Удобные: `contains`, `icontains` → оборачиваются в `%...%` (`like` / `ilike`)
+- Префикс/суффикс: `starts_with`, `ends_with` → через `LIKE` с `%`
+
+## IntFilter / FloatFilter / DecimalFilter
+
+Наследуют числовые операции поверх общих:
+
+- `gt`, `gte`, `lt`, `lte`, `between=(a, b)` → BETWEEN включительно
+
+## DateFilter / DateTimeFilter / TimeFilter / TimestampFilter
+
+- Общие операции как у числовых: `gt`, `gte`, `lt`, `lte`, `between`, `in_`, `not_in`, NULL-проверки
+- Алиасы периода: `from_` → `>=`, `to` → `<=` (удобно для диапазона дат)
+
+## BooleanFilter
+
+Только: `eq`, `ne`, `is_null`, `is_not_null` (без сравнений `gt`/`lt`).
+
+## UUIDFilter
+
+Только общие операции: `eq`, `ne`, `in_`, `not_in`, NULL-проверки.  
+Для «нескольких id» используйте **`UUIDFilter(in_=[...])`**, а не список фильтров на одно поле — на одно поле схемы ожидается **один** экземпляр фильтра.
+
+## EnumFilter[YourEnum]
+
+Только общие операции. При колонке с типом `sqlalchemy.Enum` dplex приводит строки/enum к значению, совместимому с колонкой.
+
+## WordsFilter
+
+- Строка `text` режется по пробелам на слова; для **каждого** слова: OR по колонкам, между словами — **AND**.
+- `columns=None`: поиск в колонке с **тем же именем**, что и поле в `DPFilters` (поле должно быть в модели).
+- `columns=[Model.col1, Model.col2, ...]`: поиск по нескольким колонкам (типично для кастомного поля `query` в схеме); тогда поле может **не** быть колонкой модели — обработка через `WordsFilter` в applier.
+- Пустой `text` → фильтр не применяется.
+
+## Кастомные поля фильтра (нет колонки в модели)
+
+1. Объявить поле в `DPFilters` (например `query: StringFilter | None`).
+2. В сервисе переопределить `apply_custom_filters`: взять `self._get_custom_filters(filter_data)` и добавить условия на `query_builder` (например `or_` по нескольким колонкам).
+
+По умолчанию `apply_custom_filters` у базового `DPService` кастомные поля **не** применяет.
+
+## Важно для генерации кода
+
+- Не вызывать руками `FilterApplier` в роутере, если достаточно `DPService.get_all` / `count` / `paginate`.
+- Имя параметра конструктора `DPService`: `response_schema`, не `response_schemas`.
+- `get_by_id(None)` в `DPService` **корректен** — вернёт `None` без лишней проверки вызывающего кода.
+
+Если код лежит вне перечисленных `globs` (другой каталог для HTTP или задач), добавьте шаблон в frontmatter этого файла или `alwaysApply: true` в своём проекте.

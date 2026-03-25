@@ -1,0 +1,57 @@
+---
+description: dplex — внешний слой (API, worker): sort, пагинация → DPFilters и DPService
+globs:
+  - "**/routers/**/*.py"
+  - "**/api/**/*.py"
+  - "**/routes/**/*.py"
+  - "**/workers/**/*.py"
+  - "**/worker/**/*.py"
+  - "**/tasks/**/*.py"
+  - "**/handlers/**/*.py"
+alwaysApply: false
+---
+
+# dplex: сортировка и пагинация во внешних точках входа
+
+Правило про **границу приложения**, не про объявление `filter.py` в домене. В роутере, worker, handler и т.п. из запроса/задачи собирается экземпляр `DPFilters` (или наследника) и передаётся в **`DPService`**: `get_all`, `get_first`, `count`, `paginate`, … Сервис не разбирает query-string — он получает уже готовую схему.
+
+## Пагинация
+
+- Поля **`limit`** и **`offset`** в той же схеме, что и фильтры (`DPFilters`), если вызываете `service.get_all(filters)` / `get_first` / `count` (для `count` limit/offset обычно не нужны).
+- Либо **`await service.paginate(page, per_page, filters)`**: номер страницы и размер — аргументы метода; в `filters` кладут фильтрацию и **сортировку**, limit/offset сервис проставит сам при выборке.
+
+## Опциональный `sort_by` (частый кейс в API)
+
+Типовой список: у клиента опциональные `sort_by` и направление `sort`. dplex **не сортирует**, если поле сортировки не задано.
+
+- Один элемент из запроса: `Sort(by=request.sort_by, order=request.sort)`.
+- **Не** подставлять поле по умолчанию при `sort_by is None` (не писать `request.sort_by or DefaultSortField.CREATED_AT`).
+- **Не** жёстко задавать второе/третье поле сортировки, если API даёт клиенту один выбор `sort_by` — иначе выбор клиента игнорируется.
+
+Сборка поля `sort` схемы фильтров (в запросе направление типизировать как `Order`):
+
+```python
+sort=[
+    Sort(
+        by=request.sort_by,
+        order=request.sort,
+    ),
+],
+```
+
+Строка из query (`?sort=desc`): `order=Order(request.sort)`. При `sort_by is None` допустимо `Sort(by=None, order=...)` — такое правило отбрасывается, ORDER BY не добавляется.
+
+Разные enum в API и в домене — приводить только если `sort_by` задан:
+
+```python
+by=EventSortField(request.sort_by.value) if request.sort_by is not None else None
+```
+
+## DPFilters и `Sort`
+
+- База: `DPFilters[SortFieldEnum]`; поле сортировки в схеме называется **`sort`**.
+- `Sort(by=..., order=..., nulls=...)`: `by` может быть `None`; `nulls` опционально (`NullsPlacement.FIRST` / `LAST`).
+- Несколько полей: `sort=[Sort(by=A, order=Order.ASC), Sort(by=B, order=Order.DESC)]`.
+- `has_sort()` — True только если есть хотя бы один `Sort` с `by is not None`.
+
+Если в проекте нет путей из `globs`, расширь список или временно включи `alwaysApply: true` для этого файла.

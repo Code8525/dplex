@@ -1,0 +1,42 @@
+---
+description: dplex — доменный слой подробно (модель → repo, schemas, filter, service)
+globs: "**/domain/**/*.py"
+alwaysApply: false
+---
+
+# dplex: доменный слой
+
+Библиотека: [dplex](https://github.com/Code8525/dplex) (`DPRepo`, `DPService`, `DPFilters`).
+
+Бизнес-логика в `domain`, не в роутерах. БД и SQL — в `DPRepo`; сценарии — в `DPService`. DTO в репозиторий не передавать. Фильтры/сортировка/пагинация — `DPFilters` + фильтры dplex. Массовые `update/delete` только с явным WHERE.
+
+**Структура:** `domain/<entity>/` → `model.py`, `repo.py`, `schemas.py`, `filter.py`, `service.py`. Имена типов от имени домена: `foo_bar` → префикс `FooBar*` (`FooBarRepo`, `FooBarSchema`, …).
+
+**Если есть только `model.py`** — добавить остальные четыре файла по секциям ниже.
+
+## model.py
+
+Только SQLAlchemy-модели. Без `relationship()` — связи через FK; связанные сущности грузить явно через репозитории/сервисы. Без бизнес-логики и SQL. Имена полей = значения `StrEnum` сортировки. Нестандартный PK — `id_field_name` в репо. Удобно для `FooBarSchema.model_validate(model)`.
+
+## repo.py
+
+`class FooBarRepo(DPRepo[Model, PK])`. В `__init__`: `super().__init__(model=Model, session=session, id_field_name="<pk_field>")`. Все условия и выборки через `query()` / `QueryBuilder`. Без скрытых `commit`/`rollback`.
+
+## schemas.py
+
+Обязательно: Create, Update, схема чтения **`FooBarSchema`** (не `FooResponseSchema`); опционально — урезанные схемы. Поля явно, без наследования ради копирования. В домене без `Field(description=...)`. **Create/Update** — только поля и валидация, **без** `model_config`. **Update** — обновляемые поля как `Type | None = None`. **FooBarSchema**: `ConfigDict(from_attributes=True, populate_by_name=True, frozen=True)`. Имена/типы полей = модель. Transport (OpenAPI) — отдельно от домена.
+
+```python
+# DPService[..., FooBarCreateSchema, FooBarUpdateSchema, FooBarSchema, FooBarFilters, FooBarFields]
+# super().__init__(..., response_schema=FooBarSchema)
+```
+
+## filter.py
+
+`class FooBarFields(StrEnum)` — значения = **имена колонок** модели для сортировки. `class FooBarFilters(DPFilters[FooBarFields])`, поле **`sort`**. Атрибут на каждое фильтруемое поле: `UUIDFilter | None`, `StringFilter | None`, `EnumFilter[...] | None`, `DateFilter` / `DateTimeFilter`, `IntFilter`, … — по типу колонки. Имена полей = имена полей модели. Опциональный `sort_by` → `Sort(by=None, ...)` без fallback; `limit`/`offset` из `DPFilters`. Поля без колонки в модели — `apply_custom_filters` в сервисе.
+
+## service.py
+
+`DPService[Model, PK, CreateSchema, UpdateSchema, FooBarSchema, Filters, Fields]`. `self.repository: FooBarRepo = FooBarRepo(session=session)`; `super().__init__(session=session, repository=self.repository, response_schema=FooBarSchema)`. **Валидация входа — в схемах**; в сервис передавать только экземпляры Create/Update, не «сырые» dict. Хуки: `validate_*`, `transform_*_schema`. Чтение: фильтры + сорт + limit/offset; массовый `update` — только фильтры. Кастомные поля фильтра — `apply_custom_filters`.
+
+**Denormalized / search-таблицы:** спец-логика в переопределениях сервиса — например `_create_schema_to_model`, `_make_update_dict`, `create_or_update` (например `search_vector`); репозиторий остаётся обычным `DPRepo`.

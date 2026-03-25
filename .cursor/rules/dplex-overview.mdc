@@ -1,0 +1,38 @@
+---
+description: dplex — краткий обзор библиотеки (домен + фильтры + вызов из API/worker)
+alwaysApply: true
+---
+
+# dplex: обзор
+
+Слой над **SQLAlchemy async** и **Pydantic**: `DPRepo`, `DPService`, `DPFilters`, типизированные фильтры (`StringFilter`, `IntFilter`, `UUIDFilter`, … — `from dplex import …`). Репозиторий: [github.com/Code8525/dplex](https://github.com/Code8525/dplex). Исходники пакета — каталог `dplex/`.
+
+## Домен: как устроить
+
+`domain/<entity>/`: **`model.py`** (только ORM; без `relationship()`, связи через FK) → **`repo.py`** (`DPRepo[Model, PK]`, `super().__init__(..., id_field_name=...)`, запросы через `query()`/`QueryBuilder`) → **`schemas.py`** (Create, Update, чтение **`EntitySchema`**, не `*ResponseSchema`; Create/Update без `model_config`; чтение — `from_attributes` + `frozen`) → **`filter.py`** (`EntityFields(StrEnum)` = имена колонок для сортировки, `EntityFilters(DPFilters[...])`, поле **`sort`**, фильтры по типам колонок) → **`service.py`** (`DPService[...]`, `response_schema=EntitySchema`, валидация во входных схемах). Бизнес-логика и DTO — не в репозитории. Массовые `update`/`delete` только с непустым WHERE. Кастомные поля фильтра без колонки — **`apply_custom_filters`**.
+
+## Фильтры и сервис: как работает
+
+Активные поля `DPFilters` (кроме `sort`, `limit`, `offset`) мапятся на колонки модели; **`FilterApplier`** строит WHERE по типу фильтра. Нет атрибута на модели — поле пропускается → обработка в **`apply_custom_filters`**.
+
+Методы **`DPService`**: `get_all` / `get_first` — фильтры + **sort** + **limit/offset**; `paginate(page, per_page, filters)` — считает и выбирает страницу; `count` — только WHERE; `update` / `delete` — только WHERE (без sort/limit). В роутере чаще достаточно передать готовый `filters` в сервис, без ручного `FilterApplier`. Конструктор: аргумент **`response_schema`**. `get_by_id(None)` допустим → `None`.
+
+Операции фильтров (часто AND между заданными): общие **`eq`, `ne`, `in_`, `not_in`, `is_null`, `is_not_null`**; у строк — **`like`/`ilike`/`contains`/`icontains`/`starts_with`/`ends_with`**; у чисел и дат — **`gt`/`gte`/`lt`/`lte`/`between`**, у дат ещё **`from_`/`to`**; несколько UUID — **`UUIDFilter(in_=[...])`**; полнотекст по словам — **`WordsFilter`**; перечисления — **`EnumFilter`**.
+
+## Внешний слой: API, worker
+
+Из запроса/задачи собрать экземпляр **`EntityFilters`** и вызвать **`await service.get_all(filters)`** (или `paginate`, `count`, …). Сервис не разбирает query-string.
+
+**Пагинация:** `limit`/`offset` в той же схеме, что фильтры, **или** `await service.paginate(page, per_page, filters)` (в `filters` — фильтрация и сортировка).
+
+**Сортировка:** опциональный **`sort_by`** → один элемент `Sort(by=request.sort_by, order=request.sort)`; при `sort_by is None` **не** подставлять поле по умолчанию; `Sort(by=None, ...)` даёт отсутствие ORDER BY. Разные enum в API и в домене — приводить **`by`** только если `sort_by` задан.
+
+## Точечные правила (детали при работе с файлами)
+
+| Файл | Когда подгружается |
+|------|-------------------|
+| `dplex-domain.mdc` | `**/domain/**/*.py` — доменный слой развёрнуто |
+| `dplex-external-sort-pagination.mdc` | роутеры, `api`, `routes`, workers, tasks, handlers |
+| `dplex-filters-service-queries.mdc` | домен + те же внешние пути — типы фильтров и цепочка запросов |
+
+При необходимости расширьте `globs` в точечных правилах или включите им `alwaysApply` в своём проекте.
