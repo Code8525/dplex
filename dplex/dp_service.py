@@ -79,16 +79,31 @@ class DPService[
         """
         return self.response_schema.model_validate(model)
 
+    @staticmethod
+    def _schema_to_raw_dict(schema: BaseModel) -> dict[str, Any]:
+        """
+        Словарь полей схемы для ORM: сырые Python-значения (enum, UUID, datetime, …).
+
+        Не использовать model_dump: у полей с кастомной сериализацией (например CamelCaseEnum)
+        в словарь попадут строки для API, несовместимые с native enum в PostgreSQL.
+        """
+        return {field: getattr(schema, field) for field in type(schema).model_fields}
+
+    @staticmethod
+    def _schema_to_raw_update_dict(schema: BaseModel) -> dict[str, Any]:
+        """Частичное обновление: только model_fields_set, значения без API-сериализации."""
+        return {field: getattr(schema, field) for field in schema.model_fields_set}
+
     def _create_schema_to_model(self, schema: CreateSchemaType) -> ModelType:
         """
         Автоматическое преобразование схемы создания в SQLAlchemy модель
-        Работает через model_dump() и **kwargs в конструктор модели.
+        Через сырые атрибуты схемы и **kwargs в конструктор модели (см. _schema_to_raw_dict).
         Args:
             schema: Схема создания с данными
         Returns:
             Новый экземпляр SQLAlchemy модели
         """
-        return self.repository.model(**schema.model_dump(exclude_unset=False))
+        return self.repository.model(**self._schema_to_raw_dict(schema))
 
     def _apply_filter_to_query(
         self, query_builder: "QueryBuilder[ModelType]", filter_data: FilterSchemaType
@@ -343,7 +358,7 @@ class DPService[
         Returns:
             Словарь с парами {имя_поля: значение} для передачи в репозиторий
         """
-        return update_data.model_dump(exclude_unset=True)
+        return self._schema_to_raw_update_dict(update_data)
 
     def _clone_and_modify_filter(
         self,
